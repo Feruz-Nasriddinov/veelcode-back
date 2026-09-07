@@ -1,0 +1,75 @@
+# ==========================================
+# Django & Python Core
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+
+# ==========================================
+# Environments & Dependencies
+# ==========================================
+.env
+.venv/
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Static & Media Files
+# ==========================================
+# Ignore user-uploaded media files
+media/
+
+# Ignore gathered static files (after running collectstatic)
+staticfiles/
+static_root/
+
+# ==========================================
+# Logging & OS Files
+# ==========================================
+*.log
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# IDE & Code Editor Settings
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==========================================
+# Testing & Coverage
+# ==========================================
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
