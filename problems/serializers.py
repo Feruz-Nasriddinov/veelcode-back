@@ -6,15 +6,14 @@ class ProblemFileSerializer(serializers.ModelSerializer):
         model = ProblemFile
         fields = ['id', 'directory', 'content']
 
-class ProblemDetailSerializer(serializers.ModelSerializer):
+class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
 
     class Meta:
         model = Problem
         fields = ['id', 'title', 'description', 'files', 'difficulty']
 
-class ProblemListSerializer(serializers.ModelSerializer):
-
+class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
         fields = ['id', 'title', 'description', 'difficulty']
