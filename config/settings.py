@@ -133,6 +133,6 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'send-problems': '20/min',
         'send-content': '20/min',
-
+        'send-score': '20/min',
     },
 }
