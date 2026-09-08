@@ -63,6 +63,7 @@ class SubmitView(APIView):
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 
+#this view should be called after a certain delay like around 8 seconds (for now, the real ballpark range is not decided yet)
 class SubmissionDetailsView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'submission-details'
