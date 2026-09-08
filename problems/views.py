@@ -39,7 +39,7 @@ class ScoreView(APIView):
 
     def get(self, request, problem_id):
 
-        user_detail = get_object_or_404(UserDetail, problem_id=problem_id, user=request.user)
+        user_detail = UserDetail.objects.filter(problem_id=problem_id, user=request.user).select_related('problem')
 
         serializer = UserDetailSerializer(user_detail)
 
