@@ -6,6 +6,8 @@ from rest_framework.generics import get_object_or_404
 
 from .models import Problem, ProblemFile
 from .serializers import ProblemFileSerializer, ProblemListSerializer, ProblemDetailSerializer
+from users.models import UserDetail
+from users.serializers import UserDetailSerializer
 
 class ProblemListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -28,5 +30,17 @@ class ProblemDetailView(APIView):
         problem = get_object_or_404(Problem, id=problem_id)
 
         serializer = ProblemDetailSerializer(problem)
+
+        return Response(serializer.data)
+
+class ScoreView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'send-score'
+
+    def get(self, request, problem_id):
+
+        user_detail = get_object_or_404(UserDetail, problem_id=problem_id, user=request.user)
+
+        serializer = UserDetailSerializer(user_detail)
 
         return Response(serializer.data)
