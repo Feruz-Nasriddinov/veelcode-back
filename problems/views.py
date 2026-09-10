@@ -34,7 +34,7 @@ class ProblemDetailView(APIView):
 
         return Response(serializer.data)
 
-class ScoreView(APIView):
+class ScoresList(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'send-score'
 
