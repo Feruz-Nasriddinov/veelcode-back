@@ -4,13 +4,17 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 import docker
 from requests.exceptions import ReadTimeout
-
+from models import Problem
+from rest_framework.generics import get_object_or_404
 RUN_SCRIPT = """
 pip install -r requirements.txt pytest pytest-django > /tmp/pip.log 2>&1
 pytest --junitxml=pytest-results.xml > /tmp/pytest.log 2>&1
 """
 
-def evaluate(files, timeout=120):
+def evaluate(files, problem_id):
+    problem = get_object_or_404(Problem, id = problem_id)
+    
+    timeout = problem.time_required
     client = docker.from_env()
 
     with tempfile.TemporaryDirectory() as temp_dir:
