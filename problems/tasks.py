@@ -2,10 +2,8 @@ from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from services.evaluator import evaluate
 from users.models import UserDetail
-import xml.etree.ElementTree as ET
 
-#the time limit should be changed after testing how long a typical docker test running would take
-@shared_task(time_limit = 120, soft_time_limit = 110)
+@shared_task(time_limit = UserDetail.problem.time_required + 20, soft_time_limit = UserDetail.problem.time_required + 10)#plus 10 and 20 are a prototype
 def evaluate_tasks(submission_id, files):
     submission = UserDetail.objects.get(id=submission_id)
     submission.status = 'running'
