@@ -136,5 +136,6 @@ REST_FRAMEWORK = {
         'send-score': '20/min',
         'submit': '10/min',
         'submit-details': '20/min',
+        'upload-problem': '3/min',
     },
 }
