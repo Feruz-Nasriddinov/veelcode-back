@@ -1,30 +1,14 @@
 import os
 import tempfile
 from pathlib import Path
+import xml.etree.ElementTree as ET
 import docker
-from requests.exceptions import ConnectionError as DockerTimeout
+from requests.exceptions import ReadTimeout
 
-TEST_SCRIPT = """
-pip install -r requirements.txt pytest pytest-django
-
-echo "=== DJANGO TESTS ==="
-python manage.py test > django_test_output.txt 2>&1
-DJANGO_EXIT=$?
-
-echo "=== PYTEST TESTS ==="
-pytest --junitxml=pytest-results.xml > pytest_output.txt 2>&1
-PYTEST_EXIT=$?
-
-echo "=== DJANGO OUTPUT ==="; cat django_test_output.txt
-echo "=== PYTEST OUTPUT ==="; cat pytest_output.txt
-echo "=== PYTEST XML ==="; cat pytest-results.xml 2>/dev/null
-
-echo "=== EXIT CODES ==="
-echo "django_exit=$DJANGO_EXIT"
-echo "pytest_exit=$PYTEST_EXIT"
+RUN_SCRIPT = """
+pip install -r requirements.txt pytest pytest-django > /tmp/pip.log 2>&1
+pytest --junitxml=pytest-results.xml > /tmp/pytest.log 2>&1
 """
-# Deliberately no `exit 1` here — bash always exits 0.
-# Pass/fail is decided by parsing the EXIT CODES lines, not the container's own status.
 
 def evaluate(files, timeout=120):
     client = docker.from_env()
@@ -35,25 +19,34 @@ def evaluate(files, timeout=120):
             file_path = temp_path / filename
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
-        (temp_path / "requirements.txt").touch(exist_ok=True)  # don't crash if missing
+        (temp_path / "requirements.txt").touch(exist_ok=True)
 
         container = client.containers.run(
             "django-evaluator",
-            ["bash", "-c", TEST_SCRIPT],
+            ["bash", "-c", RUN_SCRIPT],
             volumes={temp_dir: {"bind": "/app", "mode": "rw"}},
             working_dir="/app",
-            user=f"{os.getuid()}:{os.getgid()}",   # avoid root-owned files / cleanup failures
             mem_limit="512m",
             pids_limit=128,
-            detach=True,   # take manual control instead of run()'s exception-on-failure behavior
+            detach=True,  
         )
 
         try:
             container.wait(timeout=timeout)
-            output = container.logs(stdout=True, stderr=True).decode("utf-8", errors="replace")
-        except DockerTimeout:
-            output = "TIMED OUT after %ds" % timeout
+        except ReadTimeout:
+            container.kill()
         finally:
             container.remove(force=True)
 
-        return output
+        results_file = temp_path / "pytest-results.xml"
+        if not results_file.exists():
+            return {"total": 0, "failed": 0, "percentage": 0.0}
+
+        root = ET.parse(results_file).getroot()
+        suite = root.find("testsuite") if root.tag == "testsuites" else root
+
+        total = int(suite.attrib.get("tests", 0))
+        failed = int(suite.attrib.get("failures", 0)) + int(suite.attrib.get("errors", 0))
+        percentage = round((total - failed) / total * 100, 2) if total else 0.0
+
+        return {"percentage": percentage}
