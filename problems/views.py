@@ -16,7 +16,7 @@ class ProblemListView(APIView):
 
     def get(self, request):
 
-        problems = Problem.objects.all()
+        problems = Problem.objects.filter(status='accepted')
 
         serializer = ProblemSerializer(problems, many=True)
 
@@ -28,7 +28,7 @@ class ProblemDetailView(APIView):
 
     def get(self, request, problem_id):
 
-        problem = get_object_or_404(Problem, id=problem_id)
+        problem = get_object_or_404(Problem, id=problem_id, status='accepted')
 
         serializer = ProblemWithFilesSerializer(problem)
 
