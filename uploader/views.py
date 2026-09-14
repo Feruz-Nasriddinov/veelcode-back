@@ -28,6 +28,7 @@ class UploadProblemContentView(APIView):
 
         serializer = ProblemFileSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
+        
         serializer.save(problem=problem)
 
         return Response(status=status.HTTP_201_CREATED)
