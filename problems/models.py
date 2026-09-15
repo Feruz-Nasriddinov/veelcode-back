@@ -29,7 +29,7 @@ class Problem(models.Model):
                                                                   #while this field points to something real
 
     def __str__(self):
-        return self.title
+        return f"{self.title}-{self.difficulty}"
 
 class ProblemFile(models.Model):
     problem = models.ForeignKey(
