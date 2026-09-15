@@ -19,16 +19,17 @@ class UploadProblemView(APIView):
 
         return Response({'message': 'Uploaded Problem will be checked'}, status=status.HTTP_201_CREATED)
 
-class UploadProblemContentView(APIView):
+class UploadProblemDetailView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'upload-problem'
 
     def post(self, request, problem_id):
-        problem = get_object_or_404(Problem, id = problem_id, created_by = request.data)
 
-        serializer = ProblemFileSerializer(data = request.data)
+        problem = get_object_or_404(Problem, id = problem_id, created_by = request.user)
+
+        serializer = ProblemFileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         serializer.save(problem=problem)
 
         return Response(status=status.HTTP_201_CREATED)
