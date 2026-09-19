@@ -1,5 +1,5 @@
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 import uuid
 
 class Problem(models.Model):
@@ -21,11 +21,11 @@ class Problem(models.Model):
         editable=True
     )
     title = models.CharField(max_length=300)
-    description = models.CharField(500)
-    difficulty = models.CharField(choices=DIFFICULTY_CHOICES)
+    description = models.CharField(max_length=500)
+    difficulty = models.CharField(choices=DIFFICULTY_CHOICES, max_length=6)
     time_required = models.IntegerField(default=120)
-    status = models.CharField(choices=STATUS_CHOICES)
-    created_by = models.ForeignKey(User, on_delete=models.PROTECT)#this part means, when building the auth, deletion of accounts should be impossible and only the name and the email should be removed
+    status = models.CharField(choices=STATUS_CHOICES, max_length=8)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)#this part means, when building the auth, deletion of accounts should be impossible and only the name and the email should be removed
                                                                   #while this field points to something real
 
     def __str__(self):
