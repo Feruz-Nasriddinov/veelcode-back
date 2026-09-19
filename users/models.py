@@ -4,6 +4,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.functions import Lower
 from problems.models import Problem
+import uuid
 
 username_validator = RegexValidator(
     regex=r'^[\w.+-]+\Z',
@@ -32,7 +33,11 @@ class UserDetail(models.Model):
         ('done', 'done'),
         ('failed', 'failed'),
     ]
-
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=True
+    )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='details')
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name='details')
     score = models.IntegerField(default=0)
