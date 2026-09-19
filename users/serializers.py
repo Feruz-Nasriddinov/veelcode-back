@@ -7,4 +7,4 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserDetail
-        fields = ['id', 'score', 'problem', 'status', 'error_message']
+        fields = ['id', 'score', 'problem', 'status']
