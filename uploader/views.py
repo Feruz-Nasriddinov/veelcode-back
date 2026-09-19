@@ -27,6 +27,9 @@ class UploadProblemDetailView(APIView):
 
         problem = get_object_or_404(Problem, id = problem_id, created_by = request.user)
 
+        if problem.status == 'accepted':
+            return Response({"message": 'Cannot make changes to the accepted problems'}, status=status.HTTP_400_BAD_REQUEST)
+        
         serializer = ProblemFileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
