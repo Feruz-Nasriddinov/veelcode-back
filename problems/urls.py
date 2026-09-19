@@ -6,5 +6,5 @@ urlpatterns = [
     path('problems/<uuid:problem_id>/', ProblemDetailView.as_view()),
     path('problems/<uuid:problem_id>/history/', ScoresList.as_view()),
     path('problems/<uuid:problem_id>/submit/', SubmitView.as_view()),
-    path('problems/<uuid:problem_id>/score/', SubmissionDetailsView.as_view()),
+    path('problems/<uuid:submission_id>/score/', SubmissionDetailsView.as_view()),
 ]
