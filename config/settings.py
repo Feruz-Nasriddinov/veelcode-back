@@ -128,11 +128,35 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+EMAIL_BACKEND_PATH = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+    if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend',
+)
+
+if EMAIL_BACKEND_PATH == 'django.core.mail.backends.smtp.EmailBackend':
+    EMAIL_OPTIONS = {
+        'host': os.getenv('EMAIL_HOST', ''),
+        'port': int(os.getenv('EMAIL_PORT', '587')),
+        'username': os.getenv('EMAIL_HOST_USER', ''),
+        'password': os.getenv('EMAIL_HOST_PASSWORD', ''),
+        'use_tls': env_bool('EMAIL_USE_TLS', True),
+    }
+else:
+    EMAIL_OPTIONS = {}
+
 MAILERS = {
     'default': {
-        'BACKEND': 'django.core.mail.backends.console.EmailBackend',
+        'BACKEND': EMAIL_BACKEND_PATH,
+        'OPTIONS': EMAIL_OPTIONS,
     },
 }
+
+SUBMISSION_MAX_FILES = 200
+SUBMISSION_MAX_PATH_LENGTH = 255
+SUBMISSION_MAX_TOTAL_BYTES = 1024 * 1024
+
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
