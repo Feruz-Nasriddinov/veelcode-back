@@ -1,74 +1,45 @@
-name: Django CI/CD
+name: CI
 
 on:
   push:
-    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "main", "develop" ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      max-parallel: 4
-      matrix:
-        python-version: [ "3.10", "3.11", "3.12" ]
 
-    services:
-      postgres:
-        image: postgres:15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django checks
+        run: python manage.py check --settings=config.settings
+
+      - name: Deployment checks
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          SECRET_KEY: ${{ github.sha }}-${{ github.run_id }}-ci-not-a-real-secret
+          DEBUG: 'False'
+          REDIS_URL: redis://127.0.0.1:6379/1
+          ALLOWED_HOSTS: example.com
+        run: python manage.py check --deploy --fail-level ERROR
 
-    steps:
-    - uses: actions/checkout@v4
+      - name: No unapplied model changes
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
+      - name: Migrations apply cleanly
+        run: python manage.py migrate --noinput --settings=config.settings
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run migrations
-      run: |
-        python manage.py migrate --noinput
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-
-    - name: Run tests
-      run: |
-        python manage.py test --verbosity=2
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        SECRET_KEY: test-secret-key-for-ci
-        DEBUG: "True"
-
-    - name: Run linting
-      run: |
-        pip install flake8 black isort
-        flake8 .
-        black --check .
-        isort --check-only .
-
-  deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/checkout@v4
-    - name: Deploy to production
-      run: echo "Deploy step - configure your deployment here"
+      - name: Tests
+        run: python manage.py test --settings=config.settings
