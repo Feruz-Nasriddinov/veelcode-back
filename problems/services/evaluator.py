@@ -4,7 +4,7 @@ from pathlib import Path
 import xml.etree.ElementTree as ET
 import docker
 from requests.exceptions import ReadTimeout
-from models import Problem
+from problems.models import Problem
 from rest_framework.generics import get_object_or_404
 RUN_SCRIPT = """
 pip install -r requirements.txt pytest pytest-django > /tmp/pip.log 2>&1
@@ -18,9 +18,11 @@ def evaluate(files, problem_id):
     client = docker.from_env()
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
+        temp_path = Path(temp_dir).resolve()
         for filename, content in files.items():
-            file_path = temp_path / filename
+            file_path = (temp_path / filename).resolve()
+            if not file_path.is_relative_to(temp_path):
+                raise ValueError("Submitted file path escapes the working directory.")
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
         (temp_path / "requirements.txt").touch(exist_ok=True)
@@ -28,11 +30,12 @@ def evaluate(files, problem_id):
         container = client.containers.run(
             "django-evaluator",
             ["bash", "-c", RUN_SCRIPT],
-            volumes={temp_dir: {"bind": "/app", "mode": "rw"}},
+            volumes={str(temp_path): {"bind": "/app", "mode": "rw"}},
             working_dir="/app",
             mem_limit="512m",
             pids_limit=128,
-            detach=True,  
+            network_mode="none",
+            detach=True,
         )
 
         try:
