@@ -4,9 +4,11 @@ from .models import Problem
 from .services.evaluator import evaluate
 from users.models import UserDetail
 
+from rest_framework.generics import get_object_or_404
+
 @shared_task()
 def evaluate_tasks(submission_id, files):
-    submission = UserDetail.objects.get(id=submission_id)
+    submission = get_object_or_404(UserDetail, id=submission_id)
     submission.status = 'running'
     submission.save(update_fields=['status'])
 
