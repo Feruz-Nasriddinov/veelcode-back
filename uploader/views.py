@@ -17,7 +17,7 @@ class UploadProblemView(APIView):
         serializer = ProblemSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save(status='pending', created_by = request.user, created_at = timezone.now())
+        serializer.save(status='pending', created_by = request.user)
 
         return Response({'message': 'Uploaded Problem will be checked'}, status=status.HTTP_201_CREATED)
 
