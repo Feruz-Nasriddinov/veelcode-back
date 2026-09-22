@@ -21,7 +21,7 @@ class ProblemListView(APIView):
 
     def get(self, request):
 
-        problems = Problem.objects.filter(status='accepted')
+        problems = Problem.objects.filter(status='accepted').order_by('created_at')
 
         paginator = ProblemPagination()
 
@@ -33,7 +33,7 @@ class ProblemListView(APIView):
 
         serializer = ProblemSerializer(page, many=True)
 
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
 
 class ProblemDetailView(APIView):
     permission_classes = [IsAuthenticated]

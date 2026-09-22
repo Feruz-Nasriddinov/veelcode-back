@@ -27,6 +27,7 @@ class Problem(models.Model):
     status = models.CharField(choices=STATUS_CHOICES, max_length=8)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)#this part means, when building the auth, deletion of accounts should be impossible and only the name and the email should be removed
                                                                   #while this field points to something real
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.title}-{self.difficulty}"
