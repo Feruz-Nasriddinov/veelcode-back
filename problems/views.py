@@ -21,7 +21,7 @@ class ProblemListView(APIView):
 
     def get(self, request):
 
-        problems = Problem.objects.filter(status='accepted').order_by('created_at')
+        problems = Problem.objects.filter(status='accepted').order_by('-created_at')
 
         paginator = ProblemPagination()
 
@@ -80,7 +80,7 @@ class SubmissionDetailsView(APIView):
 
     def get(self, request):
 
-        submissions = UserDetail.objects.filter(user = request.user).select_related('problem')
+        submissions = UserDetail.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
 
         data = UserDetailSerializer(submissions, many=True).data
 
