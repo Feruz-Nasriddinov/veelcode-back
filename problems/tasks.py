@@ -9,13 +9,16 @@ from rest_framework.generics import get_object_or_404
 @shared_task()
 def evaluate_tasks(submission_id, files):
     submission = get_object_or_404(UserDetail, id=submission_id)
-    submission.status = 'running'
-    submission.save(update_fields=['status'])
 
     try:
         result = evaluate(files, submission.problem_id)
-        percentage = result.get('percentage')
-        submission.status, submission.score = 'done', percentage
+        if result.get('status') == 'timeout':
+            submission.status, submission.error_message = 'failed', 'Evaluation timed out'
+        elif result.get('status') == 'failed':
+            submission.status, submission.error_message = 'failed', 'Internal error happened'#vague, needs fixing later
+        else:
+            percentage = result.get('percentage')
+            submission.status, submission.score = 'done', percentage
     except SoftTimeLimitExceeded:
         submission.status, submission.error_message = 'failed', 'Evaluation timed out'
     except Exception as e:

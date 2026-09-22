@@ -14,7 +14,7 @@ pytest --junitxml=pytest-results.xml > /tmp/pytest.log 2>&1
 def evaluate(files, problem_id):
     problem = get_object_or_404(Problem, id = problem_id)
     
-    timeout = problem.time_required
+    timeout = problem.time_required + 10#prototype for the test/early version 
     client = docker.from_env()
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -42,18 +42,19 @@ def evaluate(files, problem_id):
             container.wait(timeout=timeout)
         except ReadTimeout:
             container.kill()
+            return {'percentage': 0, 'status': 'timeout'}
         finally:
             container.remove(force=True)
 
         results_file = temp_path / "pytest-results.xml"
         if not results_file.exists():
-            return {"percentage": 0.0}
+            return {"percentage": 0, 'status': 'failed'}
 
         root = ET.parse(results_file).getroot()
         suite = root.find("testsuite") if root.tag == "testsuites" else root
 
         total = int(suite.attrib.get("tests", 0))
         failed = int(suite.attrib.get("failures", 0)) + int(suite.attrib.get("errors", 0))
-        percentage = int(round((total - failed) / total * 100, -1)) if total else 0.0
+        percentage = int(round((total - failed) / total * 100, -1)) if total else 0
 
-        return {"percentage": percentage}
+        return {"percentage": percentage, "status": 'done'}
