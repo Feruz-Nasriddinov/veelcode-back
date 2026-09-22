@@ -19,12 +19,17 @@ def evaluate(files, problem_id):
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir).resolve()
+
         for filename, content in files.items():
+
             file_path = (temp_path / filename).resolve()
+
             if not file_path.is_relative_to(temp_path):
                 raise ValueError("Submitted file path escapes the working directory.")
+            
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
+
         (temp_path / "requirements.txt").touch(exist_ok=True)
 
         container = client.containers.run(
@@ -32,6 +37,8 @@ def evaluate(files, problem_id):
             ["bash", "-c", RUN_SCRIPT],
             volumes={str(temp_path): {"bind": "/app", "mode": "rw"}},
             working_dir="/app",
+            user=f'{os.getuid()}:{os.getgid()}',
+            environment={'HOME': '/tmp', 'PYTHONDONTWRITEBYTECODE': '1'},
             mem_limit="512m",
             pids_limit=128,
             network_mode="none",
@@ -55,6 +62,6 @@ def evaluate(files, problem_id):
 
         total = int(suite.attrib.get("tests", 0))
         failed = int(suite.attrib.get("failures", 0)) + int(suite.attrib.get("errors", 0))
-        percentage = int(round((total - failed) / total * 100, -1)) if total else 0
+        percentage = round((total - failed) / total * 100) if total else 0
 
         return {"percentage": percentage, "status": 'done'}
