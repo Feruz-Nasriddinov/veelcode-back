@@ -54,6 +54,6 @@ def evaluate(files, problem_id):
 
         total = int(suite.attrib.get("tests", 0))
         failed = int(suite.attrib.get("failures", 0)) + int(suite.attrib.get("errors", 0))
-        percentage = round((total - failed) / total * 100, 2) if total else 0.0
+        percentage = int(round((total - failed) / total * 100, -1)) if total else 0.0
 
         return {"percentage": percentage}
