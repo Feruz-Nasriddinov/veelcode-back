@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 
+from django.utils import timezone
+
 from problems.models import Problem
 from problems.serializers import ProblemSerializer, ProblemFileSerializer
 
@@ -15,7 +17,7 @@ class UploadProblemView(APIView):
         serializer = ProblemSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save(status='pending', created_by = request.user)
+        serializer.save(status='pending', created_by = request.user, created_at = timezone.now())
 
         return Response({'message': 'Uploaded Problem will be checked'}, status=status.HTTP_201_CREATED)
 
