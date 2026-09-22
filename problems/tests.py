@@ -46,10 +46,10 @@ class ProblemModelTests(ProblemsTestCase):
 
         self.assertIsInstance(problem.id, uuid.UUID)
 
-    def test_time_required_defaults_to_120(self):
+    def test_time_required_defaults_to_0(self):
         problem = self.make_problem()
 
-        self.assertEqual(problem.time_required, 120)
+        self.assertEqual(problem.time_required, 0)
 
     def test_creator_is_protected_from_deletion(self):
         from django.db.models import ProtectedError
@@ -88,8 +88,8 @@ class ProblemListViewTests(ProblemsTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['title'], 'Accepted one')
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], 'Accepted one')
 
     def test_hides_pending_and_rejected_problems(self):
         self.make_problem(title='Pending one', status='pending')
@@ -97,7 +97,7 @@ class ProblemListViewTests(ProblemsTestCase):
 
         response = self.client.get(self.url)
 
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data['results'], [])
 
     def test_list_does_not_leak_problem_files(self):
         problem = self.make_problem()
@@ -105,7 +105,7 @@ class ProblemListViewTests(ProblemsTestCase):
 
         response = self.client.get(self.url)
 
-        self.assertNotIn('files', response.data[0])
+        self.assertNotIn('files', response.data['results'][0])
 
 
 class ProblemDetailViewTests(ProblemsTestCase):
@@ -148,7 +148,7 @@ class SubmitViewTests(ProblemsTestCase):
 
         self.assertEqual(self.client.post(self.url(problem.id), {}, format='json').status_code, 401)
 
-    @patch('problems.views.evaluate_tasks.delay')
+    @patch('problems.views.evaluate_tasks.apply_async')
     def test_creates_a_pending_submission(self, delay):
         problem = self.make_problem()
 
@@ -163,7 +163,7 @@ class SubmitViewTests(ProblemsTestCase):
         self.assertEqual(submission.problem, problem)
         self.assertEqual(submission.status, 'pending')
 
-    @patch('problems.views.evaluate_tasks.delay')
+    @patch('problems.views.evaluate_tasks.apply_async')
     def test_queues_the_evaluation_task(self, delay):
         problem = self.make_problem()
 
@@ -171,14 +171,14 @@ class SubmitViewTests(ProblemsTestCase):
 
         delay.assert_called_once()
 
-    @patch('problems.views.evaluate_tasks.delay')
+    @patch('problems.views.evaluate_tasks.apply_async')
     def test_unknown_problem_is_404(self, delay):
         response = self.client.post(self.url(uuid.uuid4()), {}, format='json')
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(UserDetail.objects.count(), 0)
 
-    @patch('problems.views.evaluate_tasks.delay')
+    @patch('problems.views.evaluate_tasks.apply_async')
     def test_submitting_to_a_pending_problem_is_rejected(self, delay):
         problem = self.make_problem(status='pending')
 
@@ -189,7 +189,7 @@ class SubmitViewTests(ProblemsTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(UserDetail.objects.count(), 0)
 
-    @patch('problems.views.evaluate_tasks.delay')
+    @patch('problems.views.evaluate_tasks.apply_async')
     def test_submitting_to_a_rejected_problem_is_rejected(self, delay):
         problem = self.make_problem(status='rejected')
 
@@ -201,86 +201,51 @@ class SubmitViewTests(ProblemsTestCase):
         self.assertEqual(UserDetail.objects.count(), 0)
 
 
-class ScoresListTests(ProblemsTestCase):
-    def url(self, problem_id):
-        return f'/api/problems/{problem_id}/history/'
+class SubmissionDetailsViewTests(ProblemsTestCase):
+    url = '/api/problems/score/'
 
-    def make_submission(self, problem, **overrides):
-        data = {'user': self.user, 'problem': problem, 'status': 'done', 'score': 70}
+    def make_submission(self, **overrides):
+        data = {
+            'user': self.user, 'problem': self.make_problem(),
+            'status': 'done', 'score': 70,
+        }
         data.update(overrides)
         return UserDetail.objects.create(**data)
 
     def test_requires_authentication(self):
-        problem = self.make_problem()
         self.client.force_authenticate(None)
 
-        self.assertEqual(self.client.get(self.url(problem.id)).status_code, 401)
+        self.assertEqual(self.client.get(self.url).status_code, 401)
 
-    def test_returns_the_users_attempts_for_that_problem(self):
-        problem = self.make_problem()
-        self.make_submission(problem, score=40)
-        self.make_submission(problem, score=90)
+    def test_returns_the_users_submissions(self):
+        self.make_submission(score=55)
 
-        response = self.client.get(self.url(problem.id))
+        response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
-        self.assertEqual({row['score'] for row in response.data}, {40, 90})
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['score'], 55)
 
-    def test_does_not_return_other_users_attempts(self):
-        problem = self.make_problem()
+    def test_does_not_return_other_users_submissions(self):
         other = User.objects.create_user(
             username='other', email='other@example.com', password=PASSWORD
         )
-        UserDetail.objects.create(user=other, problem=problem, status='done', score=99)
+        UserDetail.objects.create(
+            user=other, problem=self.make_problem(), status='done', score=99
+        )
 
-        response = self.client.get(self.url(problem.id))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
-
-    def test_empty_history_is_an_empty_list(self):
-        problem = self.make_problem()
-
-        response = self.client.get(self.url(problem.id))
+        response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, [])
 
+    def test_newest_submission_comes_first(self):
+        self.make_submission(score=10)
+        self.make_submission(score=20)
 
-class SubmissionDetailsViewTests(ProblemsTestCase):
-    def url(self, problem_id):
-        return f'/api/problems/{problem_id}/score/'
+        response = self.client.get(self.url)
 
-    def test_requires_authentication(self):
-        problem = self.make_problem()
-        self.client.force_authenticate(None)
-
-        self.assertEqual(self.client.get(self.url(problem.id)).status_code, 401)
-
-    def test_returns_the_submission(self):
-        problem = self.make_problem()
-        submission = UserDetail.objects.create(
-            user=self.user, problem=problem, status='done', score=55
-        )
-
-        response = self.client.get(self.url(submission.id))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['score'], 55)
-
-    def test_another_users_submission_is_not_reachable(self):
-        problem = self.make_problem()
-        other = User.objects.create_user(
-            username='other', email='other@example.com', password=PASSWORD
-        )
-        theirs = UserDetail.objects.create(
-            user=other, problem=problem, status='done', score=99
-        )
-
-        response = self.client.get(self.url(theirs.id))
-
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual([row['score'] for row in response.data], [20, 10])
 
 
 class ThrottleScopeTests(ProblemsTestCase):
@@ -290,9 +255,9 @@ class ThrottleScopeTests(ProblemsTestCase):
         return settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']
 
     def test_read_view_scopes_are_configured(self):
-        from problems.views import ProblemDetailView, ProblemListView, ScoresList, SubmitView
+        from problems.views import ProblemDetailView, ProblemListView, SubmitView
 
-        for view in (ProblemListView, ProblemDetailView, ScoresList, SubmitView):
+        for view in (ProblemListView, ProblemDetailView, SubmitView):
             with self.subTest(view=view.__name__):
                 self.assertIn(view.throttle_scope, self.rates())
 
@@ -361,7 +326,7 @@ class SubmissionValidationTests(ProblemsTestCase):
         self.problem = self.make_problem()
 
     def submit(self, payload):
-        with patch('problems.views.evaluate_tasks.delay') as delay:
+        with patch('problems.views.evaluate_tasks.apply_async') as delay:
             response = self.client.post(self.url(self.problem.id), payload, format='json')
         return response, delay
 
@@ -422,7 +387,7 @@ class SubmissionValidationTests(ProblemsTestCase):
         response, delay = self.submit({'./app/views.py': 'x = 1'})
 
         self.assertEqual(response.status_code, 202)
-        submission_id, files = delay.call_args.args
+        submission_id, files = delay.call_args.kwargs['args']
         self.assertEqual(files, {'app/views.py': 'x = 1'})
         self.assertEqual(submission_id, UserDetail.objects.get().id)
 

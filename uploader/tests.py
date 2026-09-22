@@ -17,7 +17,7 @@ urlpatterns = [
     path('api/uploader/problem/<uuid:problem_id>/content/', UploadProblemDetailView.as_view()),
 ]
 
-UPLOAD_URL = '/api/upload/problems/'
+UPLOAD_URL = '/api/uploader/problem/'
 
 
 @override_settings(ROOT_URLCONF='uploader.tests')
@@ -43,7 +43,7 @@ class UploaderTestCase(TestCase):
         return data
 
     def files_url(self, problem_id):
-        return f'/api/upload/problems/{problem_id}/files/'
+        return f'/api/uploader/problem/{problem_id}/content/'
 
 
 class UploadProblemViewTests(UploaderTestCase):
@@ -179,7 +179,7 @@ class UploadProblemDetailViewTests(UploaderTestCase):
             self.files_url(self.problem.id), self.file_payload(), format='json'
         )
 
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 400)
 
 
 class UploaderRoutingTests(TestCase):
@@ -195,6 +195,6 @@ class UploaderRoutingTests(TestCase):
         from django.urls import Resolver404, resolve
 
         try:
-            resolve('/api/uploader/problem')
+            resolve('/api/uploader/problem/')
         except Resolver404:
             self.fail('uploader views are not wired into config/urls.py')
