@@ -47,7 +47,7 @@ def evaluate(files, problem_id):
 
         results_file = temp_path / "pytest-results.xml"
         if not results_file.exists():
-            return {"total": 0, "failed": 0, "percentage": 0.0}
+            return {"percentage": 0.0}
 
         root = ET.parse(results_file).getroot()
         suite = root.find("testsuite") if root.tag == "testsuites" else root
