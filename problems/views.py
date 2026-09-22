@@ -74,9 +74,21 @@ class SubmitView(APIView):
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 
-class SubmissionDetailsView(APIView):
+class SubmissionDetailView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'submit-details'
+
+    def get(self, request, submission_id):
+
+        submission = get_object_or_404(UserDetail, id = submission_id, user = request.user)
+
+        serializer = UserDetailSerializer(submission)
+
+        return Response(serializer.data)
+
+class SubmissionHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'history'
 
     def get(self, request):
 

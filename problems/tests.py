@@ -262,9 +262,9 @@ class ThrottleScopeTests(ProblemsTestCase):
                 self.assertIn(view.throttle_scope, self.rates())
 
     def test_submission_details_scope_is_configured(self):
-        from problems.views import SubmissionDetailsView
+        from problems.views import SubmissionHistoryView
 
-        self.assertIn(SubmissionDetailsView.throttle_scope, self.rates())
+        self.assertIn(SubmissionHistoryView.throttle_scope, self.rates())
 
 
 class EvaluationTaskTests(ProblemsTestCase):

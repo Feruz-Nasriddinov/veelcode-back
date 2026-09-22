@@ -194,6 +194,7 @@ REST_FRAMEWORK = {
         'auth-signup': '10/hour',
         'auth-login': '10/min',
         'auth-refresh': '20/min',
+        'history': '20/min',
     },
 }
 
