@@ -29,7 +29,6 @@ class User(AbstractUser):
 class UserDetail(models.Model):
     CHOICES = [
         ('pending', 'pending'),
-        ('running', 'running'),
         ('done', 'done'),
         ('failed', 'failed'),
     ]
