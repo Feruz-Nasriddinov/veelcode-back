@@ -40,7 +40,7 @@ class UserDetail(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='details')
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name='details')
     score = models.IntegerField(default=0)
-    status = models.CharField(choices=CHOICES, max_length=7)
+    status = models.CharField(choices=CHOICES, max_length=7, default='pending')
     error_message = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
