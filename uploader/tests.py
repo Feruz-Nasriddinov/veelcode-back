@@ -13,8 +13,8 @@ PASSWORD = 'Sup3rSecret!pass'
 
 urlpatterns = [
     path('api/auth/', include('authentication.urls')),
-    path('api/upload/problems/', UploadProblemView.as_view()),
-    path('api/upload/problems/<uuid:problem_id>/files/', UploadProblemDetailView.as_view()),
+    path('api/uploader/problem/', UploadProblemView.as_view()),
+    path('api/uploader/problem/<uuid:problem_id>/content/', UploadProblemDetailView.as_view()),
 ]
 
 UPLOAD_URL = '/api/upload/problems/'
