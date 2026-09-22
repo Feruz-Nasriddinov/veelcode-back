@@ -1,3 +1,5 @@
+from django.db import transaction
+from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -61,16 +63,23 @@ class SubmitView(APIView):
         serializer = SubmissionFilesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        submission = UserDetail.objects.create(
-                user = request.user,
-                problem = problem,
-                status = 'pending'
+        try:
+            with transaction.atomic():
+                submission = UserDetail.objects.create(
+                        user = request.user,
+                        problem = problem,
+                        status = 'pending'
+                    )
+                evaluate_tasks.apply_async(
+                    args=[submission.id, serializer.validated_data],
+                    time_limit = problem.time_required + 20,
+                    soft_time_limit = problem.time_required + 10,
+                )
+        except OperationalError:
+            return Response(
+                {'message': 'Evaluation queue is unavailable, try again shortly'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        evaluate_tasks.apply_async(
-            args=[submission.id, serializer.validated_data],
-            time_limit = submission.problem.time_required + 20,
-            soft_time_limit = submission.problem.time_required + 10,
-        )
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 

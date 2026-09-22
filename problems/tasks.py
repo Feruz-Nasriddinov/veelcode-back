@@ -4,11 +4,12 @@ from .models import Problem
 from .services.evaluator import evaluate
 from users.models import UserDetail
 
-from rest_framework.generics import get_object_or_404
-
-@shared_task()
-def evaluate_tasks(submission_id, files):
-    submission = get_object_or_404(UserDetail, id=submission_id)
+@shared_task(bind=True, max_retries=5, default_retry_delay=1)
+def evaluate_tasks(self, submission_id, files):
+    try:
+        submission = UserDetail.objects.get(id=submission_id)
+    except UserDetail.DoesNotExist as exc:
+        raise self.retry(exc=exc)
 
     try:
         result = evaluate(files, submission.problem_id)
