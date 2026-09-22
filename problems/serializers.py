@@ -22,8 +22,8 @@ class ProblemWithFilesSerializer(serializers.ModelSerializer):
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'difficulty', 'time_required']
-        read_only_fields = ['id','time_required']
+        fields = ['id', 'title', 'description', 'difficulty']
+        read_only_fields = ['id']
 
 class SubmissionFilesSerializer(serializers.Serializer):
     def to_internal_value(self, data):

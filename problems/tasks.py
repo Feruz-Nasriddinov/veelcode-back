@@ -4,9 +4,7 @@ from .models import Problem
 from .services.evaluator import evaluate
 from users.models import UserDetail
 
-TIME_REQUIRED = Problem._meta.get_field('time_required').default
-
-@shared_task(time_limit = TIME_REQUIRED + 20, soft_time_limit = TIME_REQUIRED + 10)#plus 10 and 20 are a prototype
+@shared_task()
 def evaluate_tasks(submission_id, files):
     submission = UserDetail.objects.get(id=submission_id)
     submission.status = 'running'

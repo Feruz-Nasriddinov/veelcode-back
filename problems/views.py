@@ -78,7 +78,11 @@ class SubmitView(APIView):
                 problem = problem,
                 status = 'pending'
             )
-        evaluate_tasks.delay(submission.id, serializer.validated_data)
+        evaluate_tasks.apply_async(
+            args=[submission.id, serializer.validated_data],
+            time_limit = submission.problem.time_required + 20,
+            soft_time_limit = submission.problem.time_required + 10,
+        )
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 
