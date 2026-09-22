@@ -42,6 +42,7 @@ class UserDetail(models.Model):
     score = models.IntegerField(default=0)
     status = models.CharField(choices=CHOICES, max_length=7)
     error_message = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'{self.user.username}-{self.score}'
