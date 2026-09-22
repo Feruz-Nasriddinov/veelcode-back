@@ -200,9 +200,43 @@ class SubmitViewTests(ProblemsTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(UserDetail.objects.count(), 0)
 
+    @patch('problems.views.evaluate_tasks.apply_async')
+    def test_broker_failure_rolls_the_submission_back(self, apply_async):
+        from kombu.exceptions import OperationalError
 
-class SubmissionDetailsViewTests(ProblemsTestCase):
-    url = '/api/problems/score/'
+        apply_async.side_effect = OperationalError('broker is down')
+        problem = self.make_problem()
+
+        response = self.client.post(
+            self.url(problem.id), {'main.py': 'print(1)'}, format='json'
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(UserDetail.objects.count(), 0)
+
+    @patch('problems.views.evaluate_tasks.apply_async')
+    def test_broker_failure_leaves_no_pending_submission(self, apply_async):
+        from kombu.exceptions import OperationalError
+
+        apply_async.side_effect = OperationalError('broker is down')
+        problem = self.make_problem()
+
+        self.client.post(self.url(problem.id), {'main.py': 'print(1)'}, format='json')
+
+        self.assertFalse(UserDetail.objects.filter(status='pending').exists())
+
+    @patch('problems.views.evaluate_tasks.apply_async')
+    def test_time_limits_come_from_the_problem(self, apply_async):
+        problem = self.make_problem(time_required=300)
+
+        self.client.post(self.url(problem.id), {'main.py': 'print(1)'}, format='json')
+
+        self.assertEqual(apply_async.call_args.kwargs['time_limit'], 320)
+        self.assertEqual(apply_async.call_args.kwargs['soft_time_limit'], 310)
+
+
+class SubmissionHistoryViewTests(ProblemsTestCase):
+    url = '/api/problems/history/'
 
     def make_submission(self, **overrides):
         data = {
@@ -246,6 +280,63 @@ class SubmissionDetailsViewTests(ProblemsTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual([row['score'] for row in response.data], [20, 10])
+
+    def test_every_submission_carries_its_problem(self):
+        self.make_submission()
+
+        response = self.client.get(self.url)
+
+        self.assertIn('problem', response.data[0])
+        self.assertIn('title', response.data[0]['problem'])
+
+
+class SubmissionDetailViewTests(ProblemsTestCase):
+    def url(self, submission_id):
+        return f'/api/problems/{submission_id}/score/'
+
+    def make_submission(self, **overrides):
+        data = {
+            'user': self.user, 'problem': self.make_problem(),
+            'status': 'done', 'score': 70,
+        }
+        data.update(overrides)
+        return UserDetail.objects.create(**data)
+
+    def test_requires_authentication(self):
+        submission = self.make_submission()
+        self.client.force_authenticate(None)
+
+        self.assertEqual(self.client.get(self.url(submission.id)).status_code, 401)
+
+    def test_returns_one_submission_by_id(self):
+        submission = self.make_submission(score=55)
+
+        response = self.client.get(self.url(submission.id))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['id'], str(submission.id))
+        self.assertEqual(response.data['score'], 55)
+
+    def test_another_users_submission_is_not_reachable(self):
+        other = User.objects.create_user(
+            username='other', email='other@example.com', password=PASSWORD
+        )
+        theirs = UserDetail.objects.create(
+            user=other, problem=self.make_problem(), status='done', score=99
+        )
+
+        self.assertEqual(self.client.get(self.url(theirs.id)).status_code, 404)
+
+    def test_unknown_id_is_404(self):
+        self.assertEqual(self.client.get(self.url(uuid.uuid4())).status_code, 404)
+
+    def test_error_message_is_not_exposed(self):
+        submission = self.make_submission(status='failed', error_message='/srv/secret.py')
+
+        response = self.client.get(self.url(submission.id))
+
+        self.assertNotIn('error_message', response.data)
+        self.assertNotIn('/srv/secret.py', str(response.data))
 
 
 class ThrottleScopeTests(ProblemsTestCase):
@@ -298,6 +389,29 @@ class EvaluationTaskTests(ProblemsTestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, 'failed')
         self.assertEqual(submission.error_message, 'Evaluation timed out')
+
+    def test_task_retries_when_the_submission_is_not_visible_yet(self):
+        from celery.exceptions import Retry
+
+        from problems.tasks import evaluate_tasks
+
+        with patch.object(evaluate_tasks, 'retry', side_effect=Retry()) as retry:
+            with self.assertRaises(Retry):
+                evaluate_tasks(uuid.uuid4(), {})
+
+        retry.assert_called_once()
+
+    def test_task_does_not_evaluate_a_missing_submission(self):
+        from celery.exceptions import Retry
+
+        from problems.tasks import evaluate_tasks
+
+        with patch('problems.tasks.evaluate') as evaluate:
+            with patch.object(evaluate_tasks, 'retry', side_effect=Retry()):
+                with self.assertRaises(Retry):
+                    evaluate_tasks(uuid.uuid4(), {})
+
+        evaluate.assert_not_called()
 
     def test_internal_errors_are_not_exposed_by_the_api(self):
         from users.serializers import UserDetailSerializer
