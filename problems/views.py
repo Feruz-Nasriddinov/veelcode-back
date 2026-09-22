@@ -47,18 +47,6 @@ class ProblemDetailView(APIView):
 
         return Response(serializer.data)
 
-class ScoresList(APIView):
-    permission_classes = [IsAuthenticated]
-    throttle_scope = 'send-score'
-
-    def get(self, request, problem_id):
-
-        user_detail = UserDetail.objects.filter(problem_id=problem_id, user=request.user).select_related('problem')
-
-        serializer = UserDetailSerializer(user_detail, many=True)
-
-        return Response(serializer.data)
-
 class SubmitView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'submit'
@@ -90,10 +78,10 @@ class SubmissionDetailsView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'submit-details'
 
-    def get(self, request, submission_id):
+    def get(self, request):
 
-        submission = get_object_or_404(UserDetail.objects.select_related('problem'), id = submission_id, user = request.user)
+        submissions = UserDetail.objects.filter(user = request.user).select_related('problem')
 
-        data = UserDetailSerializer(submission).data
+        data = UserDetailSerializer(submissions, many=True).data
 
         return Response(data)
