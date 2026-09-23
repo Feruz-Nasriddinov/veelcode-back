@@ -1,5 +1,9 @@
+import os
+import tempfile
+import unittest
 import uuid
-from unittest.mock import patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from django.core.cache import cache
 from django.test import TestCase
@@ -406,6 +410,32 @@ class EvaluationTaskTests(ProblemsTestCase):
         self.assertEqual(submission.status, 'done')
         self.assertEqual(submission.score, 90)
 
+    def test_a_container_timeout_is_reported_to_the_user(self):
+        from problems.tasks import evaluate_tasks
+
+        submission = self.make_submission()
+
+        with patch('problems.tasks.evaluate', return_value={'percentage': 0, 'status': 'timeout'}):
+            evaluate_tasks(submission.id, {})
+
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, 'failed')
+        self.assertEqual(submission.error_message, 'Evaluation timed out')
+
+    def test_running_out_of_memory_is_reported_to_the_user(self):
+        from problems.tasks import evaluate_tasks
+
+        submission = self.make_submission()
+
+        with patch(
+            'problems.tasks.evaluate', return_value={'percentage': 0, 'status': 'out_of_memory'}
+        ):
+            evaluate_tasks(submission.id, {})
+
+        submission.refresh_from_db()
+        self.assertEqual(submission.status, 'failed')
+        self.assertEqual(submission.error_message, 'Submission ran out of memory')
+
     def test_soft_time_limit_marks_the_submission_failed(self):
         from celery.exceptions import SoftTimeLimitExceeded
 
@@ -557,6 +587,18 @@ class EvaluatorSandboxTests(ProblemsTestCase):
         self.assertEqual(kwargs['mem_limit'], '512m')
         self.assertEqual(kwargs['pids_limit'], 128)
 
+    def test_the_run_script_never_installs_from_the_network(self):
+        from problems.services.evaluator import RUN_SCRIPT
+
+        self.assertNotIn('pip install', RUN_SCRIPT)
+
+    @patch('problems.services.evaluator.docker')
+    def test_a_submitted_requirements_file_is_not_given_to_pip(self, docker_mod):
+        self.evaluate({'requirements.txt': 'requests==2.31.0'}, docker_mod)
+
+        command = docker_mod.from_env.return_value.containers.run.call_args.args[1]
+        self.assertNotIn('requirements.txt', ' '.join(command))
+
     @patch('problems.services.evaluator.docker')
     def test_escaping_path_never_reaches_the_filesystem(self, docker_mod):
         with self.assertRaises(ValueError):
@@ -570,3 +612,288 @@ class EvaluatorSandboxTests(ProblemsTestCase):
             self.evaluate({'/etc/passwd': 'root'}, docker_mod)
 
         docker_mod.from_env.return_value.containers.run.assert_not_called()
+
+
+class EvaluatorScoringTests(TestCase):
+    def score(self, xml):
+        from problems.services.evaluator import score_report
+
+        temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(temp_dir.cleanup)
+        report = Path(temp_dir.name) / 'pytest-results.xml'
+        report.write_text(xml)
+        return score_report(report)
+
+    def suite(self, **attrs):
+        rendered = ' '.join(f'{name}="{value}"' for name, value in attrs.items())
+        return f'<testsuites><testsuite {rendered}/></testsuites>'
+
+    def test_all_passing_is_100(self):
+        self.assertEqual(self.score(self.suite(tests=4, failures=0, errors=0, skipped=0)), 100)
+
+    def test_three_of_four_rounds_to_75(self):
+        self.assertEqual(self.score(self.suite(tests=4, failures=1, errors=0, skipped=0)), 75)
+
+    def test_two_of_three_rounds_to_67(self):
+        self.assertEqual(self.score(self.suite(tests=3, failures=1, errors=0, skipped=0)), 67)
+
+    def test_errors_count_against_the_score(self):
+        self.assertEqual(self.score(self.suite(tests=2, failures=0, errors=1, skipped=0)), 50)
+
+    def test_a_skipped_test_is_not_a_passing_test(self):
+        self.assertEqual(self.score(self.suite(tests=4, failures=0, errors=0, skipped=3)), 25)
+
+    def test_skipping_everything_scores_zero(self):
+        self.assertEqual(self.score(self.suite(tests=4, failures=0, errors=0, skipped=4)), 0)
+
+    def test_no_tests_scores_zero(self):
+        self.assertEqual(self.score(self.suite(tests=0)), 0)
+
+    def test_a_bare_testsuite_root_is_read(self):
+        self.assertEqual(self.score('<testsuite tests="2" failures="1"/>'), 50)
+
+    def test_malformed_xml_scores_zero(self):
+        self.assertEqual(self.score('<testsuites>'), 0)
+
+    def test_a_report_without_a_testsuite_scores_zero(self):
+        self.assertEqual(self.score('<testsuites></testsuites>'), 0)
+
+    def test_non_numeric_attributes_score_zero(self):
+        self.assertEqual(self.score('<testsuite tests="lots" failures="many"/>'), 0)
+
+    def test_counts_larger_than_the_total_never_go_negative(self):
+        self.assertEqual(self.score('<testsuite tests="2" failures="3" skipped="4"/>'), 0)
+
+
+class EvaluatorContainerOutcomeTests(ProblemsTestCase):
+    def evaluate(self, wait_exc=None, reload_exc=None, kill_exc=None, state=None):
+        import docker as real_docker
+
+        from problems.services.evaluator import evaluate
+
+        container = MagicMock()
+        container.attrs = {'State': state or {}}
+        if wait_exc is not None:
+            container.wait.side_effect = wait_exc
+        if reload_exc is not None:
+            container.reload.side_effect = reload_exc
+        if kill_exc is not None:
+            container.kill.side_effect = kill_exc
+
+        with patch('problems.services.evaluator.docker') as docker_mod:
+            docker_mod.errors = real_docker.errors
+            docker_mod.from_env.return_value.containers.run.return_value = container
+            return evaluate({'main.py': 'x = 1'}, self.make_problem().id), container
+
+    def test_a_read_timeout_on_a_running_container_is_a_timeout(self):
+        from requests.exceptions import ReadTimeout
+
+        result, container = self.evaluate(
+            wait_exc=ReadTimeout('timed out'), state={'Running': True}
+        )
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'timeout'})
+        container.kill.assert_called_once()
+
+    def test_a_connection_error_on_a_running_container_is_a_timeout(self):
+        from requests.exceptions import ConnectionError
+
+        result, container = self.evaluate(
+            wait_exc=ConnectionError('Read timed out.'), state={'Running': True}
+        )
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'timeout'})
+        container.kill.assert_called_once()
+
+    def test_a_timed_out_container_is_removed(self):
+        from requests.exceptions import ConnectionError
+
+        _, container = self.evaluate(
+            wait_exc=ConnectionError('Read timed out.'), state={'Running': True}
+        )
+
+        container.remove.assert_called_once_with(force=True)
+
+    def test_a_kill_that_fails_does_not_break_the_timeout(self):
+        import docker as real_docker
+        from requests.exceptions import ConnectionError
+
+        result, container = self.evaluate(
+            wait_exc=ConnectionError('Read timed out.'),
+            kill_exc=real_docker.errors.APIError('already gone'),
+            state={'Running': True},
+        )
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'timeout'})
+        container.remove.assert_called_once_with(force=True)
+
+    def test_losing_the_docker_daemon_is_an_infra_error(self):
+        import docker as real_docker
+        from requests.exceptions import ConnectionError
+
+        from problems.services.evaluator import ContainerInfraError
+
+        with self.assertRaises(ContainerInfraError):
+            self.evaluate(
+                wait_exc=ConnectionError('daemon gone'),
+                reload_exc=real_docker.errors.APIError('daemon gone'),
+            )
+
+    def test_a_container_that_finished_during_the_timeout_is_still_scored(self):
+        from requests.exceptions import ConnectionError
+
+        result, container = self.evaluate(
+            wait_exc=ConnectionError('Read timed out.'), state={'Running': False}
+        )
+
+        self.assertEqual(result['status'], 'failed')
+        container.kill.assert_not_called()
+
+    def test_an_oom_killed_container_is_reported_as_out_of_memory(self):
+        result, _ = self.evaluate(state={'Running': False, 'OOMKilled': True})
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'out_of_memory'})
+
+    def test_a_missing_report_is_an_internal_failure(self):
+        result, _ = self.evaluate(state={'Running': False, 'OOMKilled': False})
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'failed'})
+
+
+class EvaluationBudgetTests(ProblemsTestCase):
+    def test_the_container_timeout_fires_before_the_celery_limits(self):
+        from problems.services.evaluator import CONTAINER_TIMEOUT_GRACE
+
+        problem = self.make_problem(time_required=300)
+
+        with patch('problems.views.evaluate_tasks.apply_async') as apply_async:
+            self.client.post(
+                f'/api/problems/{problem.id}/submit/', {'main.py': 'print(1)'}, format='json'
+            )
+
+        container_budget = problem.time_required + CONTAINER_TIMEOUT_GRACE
+        soft_limit = apply_async.call_args.kwargs['soft_time_limit']
+        hard_limit = apply_async.call_args.kwargs['time_limit']
+
+        self.assertLess(container_budget, soft_limit)
+        self.assertLess(soft_limit, hard_limit)
+
+
+@unittest.skipUnless(
+    os.environ.get('RUN_DOCKER_TESTS') == '1',
+    'Needs a Docker daemon and the django-evaluator image; set RUN_DOCKER_TESTS=1.',
+)
+class EvaluatorLiveDockerTests(ProblemsTestCase):
+    def evaluate(self, files, time_required=60):
+        from problems.services.evaluator import evaluate
+
+        return evaluate(files, self.make_problem(time_required=time_required).id)
+
+    def running_containers(self):
+        import docker
+
+        return len(
+            docker.from_env().containers.list(
+                all=True, filters={'ancestor': 'django-evaluator'}
+            )
+        )
+
+    def test_a_fully_passing_submission_scores_100(self):
+        result = self.evaluate({'test_ok.py': 'def test_a():\n    assert 1\n'})
+
+        self.assertEqual(result, {'percentage': 100, 'status': 'done'})
+
+    def test_three_of_four_passing_scores_75(self):
+        result = self.evaluate({
+            'test_mix.py': (
+                'def test_a():\n    assert 1\n'
+                'def test_b():\n    assert 1\n'
+                'def test_c():\n    assert 1\n'
+                'def test_d():\n    assert 0\n'
+            ),
+        })
+
+        self.assertEqual(result, {'percentage': 75, 'status': 'done'})
+
+    def test_skipping_the_failing_tests_does_not_earn_the_marks(self):
+        result = self.evaluate({
+            'test_skip.py': (
+                'import pytest\n'
+                'def test_a():\n    assert 1\n'
+                '@pytest.mark.skip\ndef test_b():\n    assert 0\n'
+                '@pytest.mark.skip\ndef test_c():\n    assert 0\n'
+                '@pytest.mark.skip\ndef test_d():\n    assert 0\n'
+            ),
+        })
+
+        self.assertEqual(result, {'percentage': 25, 'status': 'done'})
+
+    def test_a_submission_without_tests_scores_zero(self):
+        result = self.evaluate({'main.py': 'x = 1\n'})
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'done'})
+
+    def test_a_test_file_that_cannot_be_imported_scores_zero(self):
+        result = self.evaluate({'test_broken.py': 'def test_a(:\n    pass\n'})
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'done'})
+
+    def test_a_slow_submission_times_out(self):
+        result = self.evaluate(
+            {'test_slow.py': 'import time\ndef test_a():\n    time.sleep(60)\n'},
+            time_required=0,
+        )
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'timeout'})
+
+    def test_a_timed_out_submission_leaves_no_container_behind(self):
+        before = self.running_containers()
+
+        self.evaluate(
+            {'test_slow.py': 'import time\ndef test_a():\n    time.sleep(60)\n'},
+            time_required=0,
+        )
+
+        self.assertEqual(self.running_containers(), before)
+
+    def test_a_memory_hog_is_reported_as_out_of_memory(self):
+        result = self.evaluate({
+            'test_mem.py': 'def test_a():\n    assert bytearray(2 * 1024 * 1024 * 1024)\n',
+        })
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'out_of_memory'})
+
+    def test_the_network_is_unreachable_from_a_submission(self):
+        result = self.evaluate({
+            'test_net.py': (
+                'import socket\n'
+                'def test_a():\n'
+                '    socket.create_connection(("1.1.1.1", 80), timeout=5)\n'
+            ),
+        })
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'done'})
+
+    def test_a_fork_bomb_is_contained(self):
+        result = self.evaluate({
+            'test_fork.py': (
+                'import os\n'
+                'def test_a():\n'
+                '    for _ in range(300):\n'
+                '        if os.fork() == 0:\n'
+                '            os._exit(0)\n'
+            ),
+        })
+
+        self.assertEqual(result['status'], 'done')
+
+    def test_a_submitted_requirements_file_does_not_eat_the_time_budget(self):
+        result = self.evaluate(
+            {
+                'requirements.txt': ''.join(f'pkg{i}==1.0.0\n' for i in range(20)),
+                'test_ok.py': 'def test_a():\n    assert 1\n',
+            },
+            time_required=0,
+        )
+
+        self.assertEqual(result, {'percentage': 100, 'status': 'done'})
