@@ -97,6 +97,7 @@ class UserDetailModelTests(TestCase):
         self.problem = Problem.objects.create(
             title='Fix the cache', description='A broken cache layer',
             difficulty='medium', status='accepted', created_by=self.user,
+            field='backend', language='python', framework='django',
         )
 
     def make_detail(self, **overrides):
