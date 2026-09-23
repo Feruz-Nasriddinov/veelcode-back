@@ -22,7 +22,7 @@ class ProblemWithFilesSerializer(serializers.ModelSerializer):
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'difficulty']
+        fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework']
         read_only_fields = ['id']
 
 class SubmissionFilesSerializer(serializers.Serializer):

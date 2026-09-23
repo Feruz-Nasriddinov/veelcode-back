@@ -14,6 +14,28 @@ class Problem(models.Model):
         ('accepted', 'accepted'),
         ('rejected', 'rejected')
     ]
+
+    FIELD_CHOICES = [
+        ('backend', 'backend'),
+        ('frontend', 'frontend'),
+        ('devops', 'devops')
+    ]
+
+    LANGUAGE_CHOICES = [
+        ('python', 'python'),
+        ('javascript', 'javascript'),
+        ('typescript', 'typescript'),
+        ('golang', 'golang'),
+        ('java', 'java'),
+    ]
+
+    FRAMEWORK_CHOICES = [
+        ('django', 'django'),
+        ('django rest framework', 'django rest framework'),
+        ('react', 'react'),
+        ('next.js', 'next.js'),
+        ('spring boot', 'spring boot'),
+    ]
     
     id = models.UUIDField(
         primary_key=True,
@@ -28,6 +50,9 @@ class Problem(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)#this part means, when building the auth, deletion of accounts should be impossible and only the name and the email should be removed
                                                                   #while this field points to something real
     created_at = models.DateTimeField(auto_now_add=True)
+    field = models.CharField(choices=FIELD_CHOICES, max_length=8)
+    language = models.CharField(choices=LANGUAGE_CHOICES, max_length=10)
+    framework = models.CharField(choices=FRAMEWORK_CHOICES, max_length=50)
 
     def __str__(self):
         return f"{self.title}-{self.difficulty}"
