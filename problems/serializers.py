@@ -17,7 +17,7 @@ class ProblemWithFilesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'files', 'difficulty']
+        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework']
 
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
