@@ -38,6 +38,9 @@ class UploaderTestCase(TestCase):
             'title': 'Fix the cache',
             'description': 'A broken cache layer',
             'difficulty': 'medium',
+            'field': 'backend',
+            'language': 'python',
+            'framework': 'django',
         }
         data.update(overrides)
         return data
@@ -104,6 +107,7 @@ class UploadProblemDetailViewTests(UploaderTestCase):
         self.problem = Problem.objects.create(
             title='Fix the cache', description='A broken cache layer',
             difficulty='medium', status='pending', created_by=self.user,
+            field='backend', language='python', framework='django',
         )
 
     def file_payload(self, **overrides):
@@ -136,6 +140,7 @@ class UploadProblemDetailViewTests(UploaderTestCase):
         theirs = Problem.objects.create(
             title='Theirs', description='x', difficulty='easy',
             status='pending', created_by=other,
+            field='backend', language='python', framework='django',
         )
 
         response = self.client.post(
