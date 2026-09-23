@@ -29,6 +29,9 @@ class ProblemsTestCase(TestCase):
             'description': 'A broken cache layer',
             'difficulty': 'medium',
             'status': 'accepted',
+            'field': 'backend',
+            'language': 'python',
+            'framework': 'django',
             'created_by': self.user,
         }
         data.update(overrides)
@@ -64,6 +67,24 @@ class ProblemModelTests(ProblemsTestCase):
 
         self.assertEqual(field.max_length, 500)
 
+    def test_field_language_and_framework_are_stored(self):
+        problem = self.make_problem(
+            field='frontend', language='typescript', framework='react'
+        )
+        problem.refresh_from_db()
+
+        self.assertEqual(problem.field, 'frontend')
+        self.assertEqual(problem.language, 'typescript')
+        self.assertEqual(problem.framework, 'react')
+
+    def test_a_value_outside_the_choices_is_rejected(self):
+        from django.core.exceptions import ValidationError
+
+        problem = self.make_problem(field='mobile')
+
+        with self.assertRaises(ValidationError):
+            problem.full_clean()
+
     def test_problem_file_str_and_cascade(self):
         problem = self.make_problem()
         pf = ProblemFile.objects.create(problem=problem, directory='app/views.py', content='x = 1')
@@ -98,6 +119,15 @@ class ProblemListViewTests(ProblemsTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.data['results'], [])
+
+    def test_list_exposes_field_language_and_framework(self):
+        self.make_problem(field='devops', language='golang', framework='next.js')
+
+        row = self.client.get(self.url).data['results'][0]
+
+        self.assertEqual(row['field'], 'devops')
+        self.assertEqual(row['language'], 'golang')
+        self.assertEqual(row['framework'], 'next.js')
 
     def test_list_does_not_leak_problem_files(self):
         problem = self.make_problem()
