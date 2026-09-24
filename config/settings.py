@@ -172,6 +172,12 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_TASK_ALWAYS_EAGER', False)
 CELERY_TASK_EAGER_PROPAGATES = CELERY_TASK_ALWAYS_EAGER
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-evaluator-leftovers': {
+        'task': 'problems.tasks.cleanup_evaluator_leftovers',
+        'schedule': 300,
+    },
+}
 
 
 REST_FRAMEWORK = {
