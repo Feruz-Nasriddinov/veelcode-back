@@ -1,10 +1,11 @@
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from .models import Problem
-from .services.evaluator import evaluate
+from .services.evaluators import evaluate
 from users.models import UserDetail
 
-from .services.evaluator import ContainerInfraError
+from .services.evaluators import ContainerInfraError
+from .services.evaluators.cleanup import remove_expired
 import logging
 
 logger = logging.getLogger(__name__) 
@@ -22,6 +23,12 @@ def evaluate_tasks(self, submission_id, files):
             submission.status, submission.error_message = 'failed', 'Evaluation timed out'
         elif result.get('status') == 'out_of_memory':
             submission.status, submission.error_message = 'failed', 'Submission ran out of memory'
+        elif result.get('status') == 'no_tests':
+            submission.status, submission.error_message = 'failed', 'Problem has no hidden tests'
+        elif result.get('status') == 'unsupported':
+            submission.status, submission.error_message = 'failed', 'Unsupported problem type'
+        elif result.get('status') == 'app_failed':
+            submission.status, submission.error_message = 'failed', 'App did not start'
         elif result.get('status') == 'failed':
             submission.status, submission.error_message = 'failed', 'Internal error happened'
         else:
@@ -42,3 +49,7 @@ def evaluate_tasks(self, submission_id, files):
         submission.status, submission.error_message = 'failed', 'Internal error occurred'
 
     submission.save(update_fields=['status', 'score', 'error_message'])
+
+@shared_task
+def cleanup_evaluator_leftovers():
+    return remove_expired()
