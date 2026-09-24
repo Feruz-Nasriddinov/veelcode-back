@@ -87,11 +87,11 @@ All endpoints require authentication (`IsAuthenticated`).
 1. User submits solution files via `POST /api/problems/<uuid>/submit/`
 2. Creates `UserDetail` record with `status=pending`
 3. Celery task `evaluate_tasks` dispatched with submission ID + files
-4. Task spins up **Docker container** (`django-evaluator` image):
-   - Mounts submission files to `/app`
-   - Runs `pip install -r requirements.txt pytest pytest-django`
-   - Executes `pytest --junitxml=pytest-results.xml`
-   - Enforces time/memory/pid limits (512MB, 128 pids, problem-defined timeout)
+4. Task picks an evaluator by the problem's `field` + `framework` (`problems/services/evaluators/`):
+   - **Backend (Django / DRF):** the user's app runs in one container (`django-evaluator`), and the hidden tests run in a second container (`veelcode-backend-grader`). The tests make HTTP calls to the app over a private network with no internet.
+   - **Frontend (React, Next.js):** the app is built and served in `veelcode-frontend-runner`, and the hidden Playwright tests drive a browser against it from `veelcode-frontend-grader`.
+   - **DevOps:** there's no runner. The hidden tests read the submission, mounted read-only at `/submission`, in `veelcode-devops-grader`.
+   - Hidden tests (`ProblemFile.is_hidden=True`) never share a container with user code. Every container has memory, pid and time limits.
 5. Parses JUnit XML → calculates pass percentage
 6. Updates `UserDetail` with `score`, `status=done` (or `failed` on error/timeout)
 
@@ -143,26 +143,36 @@ redis-server
 
 # Terminal 2: Celery worker
 celery -A config worker -l info
+
+# Terminal 3: Celery beat (removes leftover evaluator containers every 5 minutes)
+celery -A config beat -l info
 ```
 
-### Docker Evaluator Image
+### Docker Evaluator Images
 
-The evaluation expects a Docker image named `django-evaluator` with:
-- Python + pytest + pytest-django pre-installed
-- Any system dependencies your problems need
-
-Build it once:
-
-```dockerfile
-# Dockerfile.evaluator
-FROM python:3.12-slim
-RUN pip install pytest pytest-django
-# Add any system packages: RUN apt-get update && apt-get install -y ...
-```
+Build once:
 
 ```bash
 docker build -t django-evaluator -f Dockerfile.evaluator .
+for image in backend-grader frontend-runner frontend-grader devops-grader; do
+  docker build -t veelcode-$image -f evaluators/$image.Dockerfile evaluators
+done
 ```
+
+### Writing hidden tests
+
+Hidden tests are pytest files. The grader plugin (`evaluators/veelcode_grader.py`) provides these fixtures:
+
+| Field | Fixture | What it is |
+|-------|---------|------------|
+| Backend | `client` | A `requests` session. Paths like `client.get("/api/x/")` go to the app, sent with `Host: localhost`. |
+| Backend / Frontend | `app_url` | The app's base URL |
+| Frontend | `page` | A Playwright page. `page.goto("/")` opens the app. |
+| DevOps | `submission_dir` | A read-only `Path` to the submitted files |
+
+- Django projects must have `manage.py` at the root and must accept `localhost` as a host.
+- Frontend apps can only use the packages pre-installed in `evaluators/frontend-runner.Dockerfile`.
+- `time_required` has to cover the app starting up or building, as well as the tests.
 
 ---
 
