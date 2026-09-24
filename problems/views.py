@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Prefetch
 from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -7,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Problem
+from .models import Problem, ProblemFile
 from .serializers import ProblemSerializer, ProblemWithFilesSerializer, SubmissionFilesSerializer
 from .tasks import evaluate_tasks
 from users.models import UserDetail
@@ -43,7 +44,10 @@ class ProblemDetailView(APIView):
 
     def get(self, request, problem_id):
 
-        problem = get_object_or_404(Problem, id=problem_id, status='accepted')
+        visible_files = Prefetch('files', queryset=ProblemFile.objects.filter(is_hidden=False))
+        problem = get_object_or_404(
+            Problem.objects.prefetch_related(visible_files), id=problem_id, status='accepted'
+        )
 
         serializer = ProblemWithFilesSerializer(problem)
 

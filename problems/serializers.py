@@ -12,6 +12,10 @@ class ProblemFileSerializer(serializers.ModelSerializer):
         fields = ['id', 'directory', 'content']
         read_only_fields = ['id']
 
+class ProblemFileUploadSerializer(ProblemFileSerializer):
+    class Meta(ProblemFileSerializer.Meta):
+        fields = ['id', 'directory', 'content', 'is_hidden']
+
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
 
