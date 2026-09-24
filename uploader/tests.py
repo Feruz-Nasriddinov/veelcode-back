@@ -132,6 +132,25 @@ class UploadProblemDetailViewTests(UploaderTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(self.problem.files.count(), 1)
         self.assertEqual(self.problem.files.get().directory, 'app/views.py')
+        self.assertFalse(self.problem.files.get().is_hidden)
+
+    def test_adds_a_hidden_test_file(self):
+        response = self.client.post(
+            self.files_url(self.problem.id),
+            self.file_payload(directory='tests/test_hidden.py', is_hidden=True),
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(self.problem.files.get().is_hidden)
+
+    def test_invalid_is_hidden_is_rejected(self):
+        response = self.client.post(
+            self.files_url(self.problem.id), self.file_payload(is_hidden='maybe'), format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(ProblemFile.objects.count(), 0)
 
     def test_cannot_add_files_to_someone_elses_problem(self):
         other = User.objects.create_user(

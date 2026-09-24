@@ -7,7 +7,7 @@ from rest_framework.generics import get_object_or_404
 from django.utils import timezone
 
 from problems.models import Problem
-from problems.serializers import ProblemSerializer, ProblemFileSerializer
+from problems.serializers import ProblemSerializer, ProblemFileUploadSerializer
 
 class UploadProblemView(APIView):
     permission_classes = [IsAuthenticated]
@@ -32,7 +32,7 @@ class UploadProblemDetailView(APIView):
         if problem.status == 'accepted' or problem.status == 'rejected':
             return Response({"message": 'Cannot make changes to the accepted problems'}, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = ProblemFileSerializer(data=request.data)
+        serializer = ProblemFileUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         serializer.save(problem=problem)
