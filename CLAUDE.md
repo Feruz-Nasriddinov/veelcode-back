@@ -52,7 +52,10 @@ Platform where users get a real, broken or incomplete codebase and must fix a bu
 
 - Treat all user-submitted code as untrusted.
 - Any code execution must be sandboxed with time, memory, and network limits. Never run submissions directly on the app server.
-- How solutions get graded is still undecided. Don't build grading logic or assume an approach without asking me first.
+- Grading: each problem has hidden test files (`ProblemFile.is_hidden=True`) that are never sent to users. On submit, only the hidden tests count; the score is passed / total × 100. The user's own tests never count.
+- Evaluators live in `problems/services/evaluators/`, one per field, picked by `field` + `framework`. Hidden tests must never run in the same container or process as user code: backend/frontend tests reach the app over a private no-internet network; DevOps tests only read the submission (read-only mount), never run it.
+- Evaluator images are built from `Dockerfile.evaluator` and `evaluators/*.Dockerfile`.
+- Ask me before changing how grading works.
 
 ## Never do without asking
 
