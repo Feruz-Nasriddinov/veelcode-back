@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F
 from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -115,12 +115,13 @@ class CommentView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'comment'
 
-    def post(self, request):
+    def post(self, request, problem_id):
+        problem = get_object_or_404(Problem, id = problem_id)
 
         serializer = WriteAndPatchCommentSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save(user = request.user)
+        serializer.save(user = request.user, problem = problem)
 
         return Response({'commented': True}, status=status.HTTP_201_CREATED)
 
@@ -144,10 +145,8 @@ class CommentDeleteView(APIView):
     
     def delete(self, request, comment_id):
 
-        Comment.objects.filter(
-            id = comment_id,
-            user = request.user
-        ).delete()
+        comment = get_object_or_404(Comment, id = comment_id, user = request.user)
+        comment.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -163,6 +162,9 @@ class LikeView(APIView):
             comment = comment
         )
 
+        if created:
+            Comment.objects.filter(id = comment_id).update(like_count = F('like_count') + 1)
+
         return Response({'liked': True}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 class UnlikeView(APIView):
@@ -173,9 +175,12 @@ class UnlikeView(APIView):
 
         comment = get_object_or_404(Comment, id = comment_id)
 
-        Like.objects.filter(
+        deleted , _ = Like.objects.filter(
             user = request.user,
             comment = comment
         ).delete()
+
+        if deleted:
+            Comment.objects.filter(id = comment_id).update(like_count = F('like_count') - 1)
 
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -15,7 +15,7 @@ class ProblemFileSerializer(serializers.ModelSerializer):
 class ReadCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
-        fields = ['id', 'text', 'likes']
+        fields = ['id', 'text', 'like_count']
 
 class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
     class Meta:

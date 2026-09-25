@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 import uuid
 
 class Problem(models.Model):
@@ -72,15 +71,16 @@ class ProblemFile(models.Model):
         return f'{self.problem.title}-{self.directory}'
 
 class Comment(models.Model):
-    user = models.ForeignKey(User, on_delete=models.SET_NULL)
-    problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name='comments')
     text = models.CharField(max_length=1000)
+    like_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return f"{self.user.username}-{self.text}"
+        return f"{self.user.username if self.user else '[deleted]'}-{self.text}"
 
 class Like(models.Model):
-    user = models.ForeignKey(User, on_delete=models.SET_NULL)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -93,4 +93,4 @@ class Like(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.username}-{self.created_at}"
+        return f"{self.user.username if self.user else '[deleted]'}-{self.created_at}"
