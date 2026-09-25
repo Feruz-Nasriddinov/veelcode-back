@@ -203,6 +203,7 @@ REST_FRAMEWORK = {
         'history': '20/min',
         'comment': '20/min',
         'like': '40/min',
+        'unlike': '40/min',
     },
 }
 
