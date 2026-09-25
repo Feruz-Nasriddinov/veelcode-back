@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework import serializers
 from rest_framework.settings import api_settings
 
-from .models import Problem, ProblemFile
+from .models import Problem, ProblemFile, Comment
 
 class ProblemFileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,16 +12,27 @@ class ProblemFileSerializer(serializers.ModelSerializer):
         fields = ['id', 'directory', 'content']
         read_only_fields = ['id']
 
+class ReadCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'text', 'likes']
+
+class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'text']
+
 class ProblemFileUploadSerializer(ProblemFileSerializer):
     class Meta(ProblemFileSerializer.Meta):
         fields = ['id', 'directory', 'content', 'is_hidden']
 
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
+    comments = ReadCommentSerializer(many=True, read_only = True)
 
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework']
+        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework', 'comments']
 
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.contrib.auth.models import User
 import uuid
 
 class Problem(models.Model):
@@ -69,3 +70,27 @@ class ProblemFile(models.Model):
 
     def __str__(self):
         return f'{self.problem.title}-{self.directory}'
+
+class Comment(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL)
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
+    text = models.CharField(max_length=1000)
+
+    def __str__(self):
+        return f"{self.user.username}-{self.text}"
+
+class Like(models.Model):
+    user = models.ForeignKey(User, on_delete=models.SET_NULL)
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields= ['user', 'comment'],
+                name = 'unique_user_comment_like'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user.username}-{self.created_at}"

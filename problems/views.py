@@ -8,8 +8,8 @@ from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 
-from .models import Problem, ProblemFile
-from .serializers import ProblemSerializer, ProblemWithFilesSerializer, SubmissionFilesSerializer
+from .models import Problem, ProblemFile, Comment, Like
+from .serializers import ProblemSerializer, ProblemWithFilesSerializer, SubmissionFilesSerializer, WriteAndPatchCommentSerializer
 from .tasks import evaluate_tasks
 from users.models import UserDetail
 from users.serializers import UserDetailSerializer
@@ -110,3 +110,72 @@ class SubmissionHistoryView(APIView):
         data = UserDetailSerializer(submissions, many=True).data
 
         return Response(data)
+
+class CommentView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'comment'
+
+    def post(self, request):
+
+        serializer = WriteAndPatchCommentSerializer(data = request.data)
+        serializer.is_valid(raise_exception=True)
+
+        serializer.save(user = request.user)
+
+        return Response({'commented': True}, status=status.HTTP_201_CREATED)
+
+class CommentPatchView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'comment'
+    
+    def patch(self, request, comment_id):
+        comment = get_object_or_404(Comment, id = comment_id, user = request.user)
+
+        serializer = WriteAndPatchCommentSerializer(comment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        serializer.save()
+
+        return Response({'message': 'Comment edited successfully'}, status=status.HTTP_200_OK)
+
+class CommentDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'comment'
+    
+    def delete(self, request, comment_id):
+
+        Comment.objects.filter(
+            id = comment_id,
+            user = request.user
+        ).delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class LikeView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'like'
+
+    def post(self, request, comment_id):
+        comment = get_object_or_404(Comment, id = comment_id)
+
+        _ , created = Like.objects.get_or_create(
+            user = request.user,
+            comment = comment
+        )
+
+        return Response({'liked': True}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+class UnlikeView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'unlike'
+
+    def delete(self, request, comment_id):
+
+        comment = get_object_or_404(Comment, id = comment_id)
+
+        Like.objects.filter(
+            user = request.user,
+            comment = comment
+        ).delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
