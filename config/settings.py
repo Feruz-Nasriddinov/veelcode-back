@@ -202,6 +202,7 @@ REST_FRAMEWORK = {
         'auth-refresh': '20/min',
         'history': '20/min',
         'comment': '20/min',
+        'comments-read': '60/min',
         'like': '40/min',
         'unlike': '40/min',
     },
