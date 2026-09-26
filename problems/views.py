@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Prefetch, F, OuterRef, Exists
+from django.db.models import Prefetch, F, Count
 from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -9,12 +9,23 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.pagination import PageNumberPagination
 
 from .models import Problem, ProblemFile, Comment, Like
-from .serializers import ProblemSerializer, ProblemWithFilesSerializer, SubmissionFilesSerializer, WriteAndPatchCommentSerializer
+from .serializers import (
+    ProblemSerializer,
+    ProblemWithFilesSerializer,
+    ReadCommentSerializer,
+    SubmissionFilesSerializer,
+    WriteAndPatchCommentSerializer,
+)
+from .services.comments import comments_for_viewer
 from .tasks import evaluate_tasks
 from users.models import UserDetail
 from users.serializers import UserDetailSerializer
 
 class ProblemPagination(PageNumberPagination):
+    max_page_size = 100
+    page_size = 20
+
+class CommentPagination(PageNumberPagination):
     max_page_size = 100
     page_size = 20
 
@@ -45,22 +56,11 @@ class ProblemDetailView(APIView):
     def get(self, request, problem_id):
 
         visible_files = Prefetch('files', queryset=ProblemFile.objects.filter(is_hidden=False))
-        comments = Prefetch(
-            'comments',
-            queryset = Comment.objects
-            .select_related('user')
-            .annotate(
-                liked_by_me = Exists(
-                    Like.objects.filter(
-                        comment = OuterRef('pk'),
-                        user = request.user
-                    )
-                )
-            )
-        )
 
         problem = get_object_or_404(
-            Problem.objects.prefetch_related(visible_files, comments), id=problem_id, status='accepted'
+            Problem.objects.prefetch_related(visible_files).annotate(comment_count=Count('comments')),
+            id=problem_id,
+            status='accepted',
         )
 
         serializer = ProblemWithFilesSerializer(problem)
@@ -129,34 +129,55 @@ class CommentView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'comment'
 
+    def get_throttles(self):
+        if self.request.method == 'GET':
+            self.throttle_scope = 'comments-read'
+
+        return super().get_throttles()
+
+    def get(self, request, problem_id):
+        problem = get_object_or_404(Problem, id = problem_id, status = 'accepted')
+
+        comments = comments_for_viewer(request.user).filter(problem = problem)
+
+        paginator = CommentPagination()
+
+        page = paginator.paginate_queryset(comments, request, view=self)
+
+        serializer = ReadCommentSerializer(page, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
+
     def post(self, request, problem_id):
-        problem = get_object_or_404(Problem, id = problem_id)
+        problem = get_object_or_404(Problem, id = problem_id, status = 'accepted')
 
         serializer = WriteAndPatchCommentSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save(user = request.user, problem = problem)
+        comment = serializer.save(user = request.user, problem = problem)
 
-        return Response({'commented': True}, status=status.HTTP_201_CREATED)
+        return Response(ReadCommentSerializer(comment).data, status=status.HTTP_201_CREATED)
 
 class CommentPatchView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'comment'
-    
+
     def patch(self, request, comment_id):
-        comment = get_object_or_404(Comment, id = comment_id, user = request.user)
+        comment = get_object_or_404(
+            comments_for_viewer(request.user), id = comment_id, user = request.user
+        )
 
         serializer = WriteAndPatchCommentSerializer(comment, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
-        serializer.save()
+        comment = serializer.save()
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(ReadCommentSerializer(comment).data, status=status.HTTP_200_OK)
 
 class CommentDeleteView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'comment'
-    
+
     def delete(self, request, comment_id):
 
         comment = get_object_or_404(Comment, id = comment_id, user = request.user)
@@ -171,15 +192,18 @@ class LikeView(APIView):
     def post(self, request, comment_id):
         comment = get_object_or_404(Comment, id = comment_id)
 
-        _ , created = Like.objects.get_or_create(
-            user = request.user,
-            comment = comment
-        )
+        with transaction.atomic():
+            _ , created = Like.objects.get_or_create(
+                user = request.user,
+                comment = comment
+            )
 
-        if created:
-            Comment.objects.filter(id = comment_id).update(like_count = F('like_count') + 1)
+            if created:
+                Comment.objects.filter(id = comment_id).update(like_count = F('like_count') + 1)
 
-        return Response({'liked': True}, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            comment.refresh_from_db(fields=['like_count'])
+
+        return Response({'liked': True, 'like_count': comment.like_count}, status=status.HTTP_200_OK)
 
 class UnlikeView(APIView):
     permission_classes = [IsAuthenticated]
@@ -189,12 +213,15 @@ class UnlikeView(APIView):
 
         comment = get_object_or_404(Comment, id = comment_id)
 
-        deleted , _ = Like.objects.filter(
-            user = request.user,
-            comment = comment
-        ).delete()
+        with transaction.atomic():
+            deleted , _ = Like.objects.filter(
+                user = request.user,
+                comment = comment
+            ).delete()
 
-        if deleted:
-            Comment.objects.filter(id = comment_id).update(like_count = F('like_count') - 1)
+            if deleted:
+                Comment.objects.filter(id = comment_id).update(like_count = F('like_count') - 1)
 
-        return Response(status=status.HTTP_204_NO_CONTENT)
+            comment.refresh_from_db(fields=['like_count'])
+
+        return Response({'liked': False, 'like_count': comment.like_count}, status=status.HTTP_200_OK)

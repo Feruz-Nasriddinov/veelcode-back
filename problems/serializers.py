@@ -20,7 +20,7 @@ class CommentAuthorSerializer(serializers.ModelSerializer):
 
 class ReadCommentSerializer(serializers.ModelSerializer):
     user = CommentAuthorSerializer(read_only = True)
-    liked_by_me = serializers.BooleanField(read_only = True)
+    liked_by_me = serializers.BooleanField(read_only = True, default = False)
 
     class Meta:
         model = Comment
@@ -37,11 +37,11 @@ class ProblemFileUploadSerializer(ProblemFileSerializer):
 
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
-    comments = ReadCommentSerializer(many=True, read_only = True)
+    comment_count = serializers.IntegerField(read_only = True)
 
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework', 'comments']
+        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework', 'comment_count']
 
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:

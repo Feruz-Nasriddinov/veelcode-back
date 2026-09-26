@@ -77,6 +77,12 @@ class Comment(models.Model):
     like_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at', '-id']
+        indexes = [
+            models.Index(fields=['problem', '-created_at'])
+        ]
+
     def __str__(self):
         return f"{self.user.username if self.user else '[deleted]'}-{self.text}"
 
