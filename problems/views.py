@@ -1,5 +1,5 @@
 from django.db import transaction
-from django.db.models import Prefetch, F
+from django.db.models import Prefetch, F, OuterRef, Exists
 from kombu.exceptions import OperationalError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -45,8 +45,20 @@ class ProblemDetailView(APIView):
     def get(self, request, problem_id):
 
         visible_files = Prefetch('files', queryset=ProblemFile.objects.filter(is_hidden=False))
+        comments = Prefetch(
+            'comments',
+            queryset = Comment.objects.annotate(
+                liked_by_me = Exists(
+                    Like.objects.filter(
+                        comment = OuterRef('pk'),
+                        user = request.user
+                    )
+                )
+            )
+        )
+
         problem = get_object_or_404(
-            Problem.objects.prefetch_related(visible_files), id=problem_id, status='accepted'
+            Problem.objects.prefetch_related(visible_files, comments), id=problem_id, status='accepted'
         )
 
         serializer = ProblemWithFilesSerializer(problem)
