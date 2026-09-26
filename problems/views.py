@@ -47,7 +47,9 @@ class ProblemDetailView(APIView):
         visible_files = Prefetch('files', queryset=ProblemFile.objects.filter(is_hidden=False))
         comments = Prefetch(
             'comments',
-            queryset = Comment.objects.annotate(
+            queryset = Comment.objects
+            .select_related('user')
+            .annotate(
                 liked_by_me = Exists(
                     Like.objects.filter(
                         comment = OuterRef('pk'),

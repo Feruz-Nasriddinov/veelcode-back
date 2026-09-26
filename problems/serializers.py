@@ -12,12 +12,18 @@ class ProblemFileSerializer(serializers.ModelSerializer):
         fields = ['id', 'directory', 'content']
         read_only_fields = ['id']
 
+class CommentAuthorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = settings.AUTH_USER_MODEL
+        fields = ['id', 'username']
+
 class ReadCommentSerializer(serializers.ModelSerializer):
+    user = CommentAuthorSerializer(read_only = True)
     liked_by_me = serializers.BooleanField(read_only = True)
 
     class Meta:
         model = Comment
-        fields = ['id', 'text', 'like_count', 'liked_by_me', 'created_at']
+        fields = ['id', 'text', 'like_count', 'liked_by_me', 'created_at', 'user']
 
 class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
     class Meta:

@@ -102,6 +102,7 @@ class CommentPatchViewTests(CommentViewTestCase):
         response = self.call(CommentPatchView, 'patch', {'text': 'edited'}, comment_id=comment.id)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {'id': comment.id, 'text': 'edited'})
         comment.refresh_from_db()
         self.assertEqual(comment.text, 'edited')
 
@@ -276,14 +277,55 @@ class CommentModelTests(CommentViewTestCase):
 
 
 class ProblemDetailCommentsTests(CommentViewTestCase):
+    def get_comments(self, user=None):
+        self.client.force_authenticate(user or self.user)
+        response = self.client.get(f'/api/problems/{self.problem.id}/')
+        self.assertEqual(response.status_code, 200)
+        return response.data['comments']
+
     def test_problem_detail_lists_its_comments(self):
         comment = self.make_comment()
         self.call(LikeView, 'post', comment_id=comment.id)
+        comment.refresh_from_db()
 
-        response = self.client.get(f'/api/problems/{self.problem.id}/')
+        comments = self.get_comments()
 
-        self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            response.data['comments'],
-            [{'id': comment.id, 'text': 'Nice problem', 'like_count': 1}],
+            comments,
+            [{
+                'id': comment.id,
+                'text': 'Nice problem',
+                'like_count': 1,
+                'liked_by_me': True,
+                'created_at': comment.created_at.isoformat().replace('+00:00', 'Z'),
+            }],
         )
+
+    def test_liked_by_me_is_false_when_only_others_liked(self):
+        comment = self.make_comment()
+        self.call(LikeView, 'post', user=self.other, comment_id=comment.id)
+
+        comments = self.get_comments()
+
+        self.assertFalse(comments[0]['liked_by_me'])
+        self.assertEqual(comments[0]['like_count'], 1)
+
+    def test_liked_by_me_is_per_viewer(self):
+        liked = self.make_comment(text='liked')
+        not_liked = self.make_comment(text='not liked')
+        self.call(LikeView, 'post', user=self.other, comment_id=liked.id)
+
+        comments = {c['id']: c['liked_by_me'] for c in self.get_comments(user=self.other)}
+
+        self.assertEqual(comments, {liked.id: True, not_liked.id: False})
+
+    def test_query_count_does_not_grow_with_comments(self):
+        self.make_comment()
+        with self.assertNumQueries(3):
+            self.get_comments()
+
+        for i in range(5):
+            comment = self.make_comment(text=f'c{i}')
+            Like.objects.create(user=self.user, comment=comment)
+        with self.assertNumQueries(3):
+            self.get_comments()
