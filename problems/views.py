@@ -137,7 +137,7 @@ class CommentPatchView(APIView):
 
         serializer.save()
 
-        return Response({'message': 'Comment edited successfully'}, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class CommentDeleteView(APIView):
     permission_classes = [IsAuthenticated]
