@@ -1,6 +1,7 @@
 from pathlib import PurePosixPath
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.settings import api_settings
 
@@ -14,7 +15,7 @@ class ProblemFileSerializer(serializers.ModelSerializer):
 
 class CommentAuthorSerializer(serializers.ModelSerializer):
     class Meta:
-        model = settings.AUTH_USER_MODEL
+        model = get_user_model()
         fields = ['id', 'username']
 
 class ReadCommentSerializer(serializers.ModelSerializer):

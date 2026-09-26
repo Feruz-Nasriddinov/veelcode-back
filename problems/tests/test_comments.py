@@ -298,8 +298,17 @@ class ProblemDetailCommentsTests(CommentViewTestCase):
                 'like_count': 1,
                 'liked_by_me': True,
                 'created_at': comment.created_at.isoformat().replace('+00:00', 'Z'),
+                'user': {'id': self.user.id, 'username': 'ryota'},
             }],
         )
+
+    def test_comment_author_is_null_after_user_is_deleted(self):
+        self.make_comment(user=self.other)
+        self.other.delete()
+
+        comments = self.get_comments()
+
+        self.assertIsNone(comments[0]['user'])
 
     def test_liked_by_me_is_false_when_only_others_liked(self):
         comment = self.make_comment()
@@ -325,7 +334,10 @@ class ProblemDetailCommentsTests(CommentViewTestCase):
             self.get_comments()
 
         for i in range(5):
-            comment = self.make_comment(text=f'c{i}')
+            author = User.objects.create_user(
+                username=f'author{i}', email=f'author{i}@example.com', password=PASSWORD
+            )
+            comment = self.make_comment(user=author, text=f'c{i}')
             Like.objects.create(user=self.user, comment=comment)
         with self.assertNumQueries(3):
             self.get_comments()
