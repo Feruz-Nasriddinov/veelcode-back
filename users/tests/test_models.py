@@ -2,10 +2,9 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from problems.models import Problem
-from users.models import User, Submission
+from users.models import User, Submission, UserLocation
 
-PASSWORD = 'Sup3rSecret!pass'
+from .base import PASSWORD, UsersTestCase
 
 
 class UserModelTests(TestCase):
@@ -89,49 +88,52 @@ class UserUniquenessTests(TestCase):
         self.assertEqual(names, {'user_username_lower_unique', 'user_email_lower_unique'})
 
 
-class UserDetailModelTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='ryota', email='ryota@example.com', password=PASSWORD
-        )
-        self.problem = Problem.objects.create(
-            title='Fix the cache', description='A broken cache layer',
-            difficulty='medium', status='accepted', created_by=self.user,
-            field='backend', language='python', framework='django',
-        )
-
-    def make_detail(self, **overrides):
-        data = {'user': self.user, 'problem': self.problem, 'status': 'pending'}
-        data.update(overrides)
-        return Submission.objects.create(**data)
-
+class SubmissionModelTests(UsersTestCase):
     def test_defaults(self):
-        detail = self.make_detail()
+        submission = Submission.objects.create(user=self.user, problem=self.problem)
 
-        self.assertEqual(detail.score, 0)
-        self.assertIsNone(detail.error_message)
+        self.assertEqual(submission.score, 0)
+        self.assertEqual(submission.status, 'pending')
+        self.assertIsNone(submission.error_message)
 
     def test_str(self):
-        detail = self.make_detail(score=80)
+        submission = self.make_submission(score=80)
 
-        self.assertEqual(str(detail), 'ryota-80')
+        self.assertEqual(str(submission), 'ryota-80')
 
     def test_related_names(self):
-        detail = self.make_detail()
+        submission = self.make_submission()
 
-        self.assertIn(detail, self.user.details.all())
-        self.assertIn(detail, self.problem.details.all())
+        self.assertIn(submission, self.user.submissions.all())
+        self.assertIn(submission, self.problem.submissions.all())
 
     def test_deleting_the_user_deletes_their_submissions(self):
-        self.make_detail()
+        self.make_submission()
 
-        self.user.details.all().delete()
+        self.user.submissions.all().delete()
 
         self.assertEqual(Submission.objects.count(), 0)
 
     def test_deleting_the_problem_cascades_to_submissions(self):
-        self.make_detail()
+        self.make_submission()
 
         self.problem.delete()
 
         self.assertEqual(Submission.objects.count(), 0)
+
+
+class UserLocationModelTests(UsersTestCase):
+    def test_timezone_defaults_to_utc(self):
+        location = UserLocation.objects.create(user=self.user)
+
+        self.assertEqual(location.timezone, 'UTC')
+
+    def test_str(self):
+        location = UserLocation.objects.create(user=self.user, timezone='Asia/Tokyo')
+
+        self.assertEqual(str(location), 'ryota - Asia/Tokyo')
+
+    def test_related_name(self):
+        location = UserLocation.objects.create(user=self.user)
+
+        self.assertEqual(self.user.location, location)
