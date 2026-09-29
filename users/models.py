@@ -49,3 +49,15 @@ class Submission(models.Model):
 
     def __str__(self):
         return f'{self.user.username}-{self.score}'
+
+class UserLocation(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="location"
+    )
+
+    timezone = models.CharField(max_length=50, default='UTC')
+
+    def __str__(self):
+        return f'{self.user.username} - {self.timezone}'
