@@ -18,7 +18,7 @@ from .serializers import (
 )
 from .services.comments import comments_for_viewer
 from .tasks import evaluate_tasks
-from users.models import UserDetail
+from users.models import Submission
 from users.serializers import UserDetailSerializer
 
 class ProblemPagination(PageNumberPagination):
@@ -83,7 +83,7 @@ class SubmitView(APIView):
 
         try:
             with transaction.atomic():
-                submission = UserDetail.objects.create(
+                submission = Submission.objects.create(
                         user = request.user,
                         problem = problem,
                         status = 'pending'
@@ -107,7 +107,7 @@ class SubmissionDetailView(APIView):
 
     def get(self, request, submission_id):
 
-        submission = get_object_or_404(UserDetail, id = submission_id, user = request.user)
+        submission = get_object_or_404(Submission, id = submission_id, user = request.user)
 
         serializer = UserDetailSerializer(submission)
 
@@ -119,7 +119,7 @@ class SubmissionHistoryView(APIView):
 
     def get(self, request):
 
-        submissions = UserDetail.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
+        submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
 
         data = UserDetailSerializer(submissions, many=True).data
 

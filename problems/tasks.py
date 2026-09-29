@@ -2,7 +2,7 @@ from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 from .models import Problem
 from .services.evaluators import evaluate
-from users.models import UserDetail
+from users.models import Submission
 
 from .services.evaluators import ContainerInfraError
 from .services.evaluators.cleanup import remove_expired
@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=5, default_retry_delay=1)
 def evaluate_tasks(self, submission_id, files):
     try:
-        submission = UserDetail.objects.get(id=submission_id)
-    except UserDetail.DoesNotExist as exc:
+        submission = Submission.objects.get(id=submission_id)
+    except Submission.DoesNotExist as exc:
         raise self.retry(exc=exc)
 
     try:

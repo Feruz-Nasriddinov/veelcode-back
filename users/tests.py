@@ -3,7 +3,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from problems.models import Problem
-from users.models import User, UserDetail
+from users.models import User, Submission
 
 PASSWORD = 'Sup3rSecret!pass'
 
@@ -103,7 +103,7 @@ class UserDetailModelTests(TestCase):
     def make_detail(self, **overrides):
         data = {'user': self.user, 'problem': self.problem, 'status': 'pending'}
         data.update(overrides)
-        return UserDetail.objects.create(**data)
+        return Submission.objects.create(**data)
 
     def test_defaults(self):
         detail = self.make_detail()
@@ -127,11 +127,11 @@ class UserDetailModelTests(TestCase):
 
         self.user.details.all().delete()
 
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
 
     def test_deleting_the_problem_cascades_to_submissions(self):
         self.make_detail()
 
         self.problem.delete()
 
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)

@@ -2,7 +2,7 @@ import uuid
 from unittest.mock import patch
 
 from problems.models import ProblemFile
-from users.models import User, UserDetail
+from users.models import User, Submission
 
 from .base import PASSWORD, ProblemsTestCase
 
@@ -114,7 +114,7 @@ class SubmitViewTests(ProblemsTestCase):
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.data['status'], 'pending')
-        submission = UserDetail.objects.get()
+        submission = Submission.objects.get()
         self.assertEqual(submission.user, self.user)
         self.assertEqual(submission.problem, problem)
         self.assertEqual(submission.status, 'pending')
@@ -132,7 +132,7 @@ class SubmitViewTests(ProblemsTestCase):
         response = self.client.post(self.url(uuid.uuid4()), {}, format='json')
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
 
     @patch('problems.views.evaluate_tasks.apply_async')
     def test_submitting_to_a_pending_problem_is_rejected(self, delay):
@@ -143,7 +143,7 @@ class SubmitViewTests(ProblemsTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
 
     @patch('problems.views.evaluate_tasks.apply_async')
     def test_submitting_to_a_rejected_problem_is_rejected(self, delay):
@@ -154,7 +154,7 @@ class SubmitViewTests(ProblemsTestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
 
     @patch('problems.views.evaluate_tasks.apply_async')
     def test_broker_failure_rolls_the_submission_back(self, apply_async):
@@ -168,7 +168,7 @@ class SubmitViewTests(ProblemsTestCase):
         )
 
         self.assertEqual(response.status_code, 503)
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
 
     @patch('problems.views.evaluate_tasks.apply_async')
     def test_broker_failure_leaves_no_pending_submission(self, apply_async):
@@ -179,7 +179,7 @@ class SubmitViewTests(ProblemsTestCase):
 
         self.client.post(self.url(problem.id), {'main.py': 'print(1)'}, format='json')
 
-        self.assertFalse(UserDetail.objects.filter(status='pending').exists())
+        self.assertFalse(Submission.objects.filter(status='pending').exists())
 
     @patch('problems.views.evaluate_tasks.apply_async')
     def test_time_limits_come_from_the_problem(self, apply_async):
@@ -200,7 +200,7 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
             'status': 'done', 'score': 70,
         }
         data.update(overrides)
-        return UserDetail.objects.create(**data)
+        return Submission.objects.create(**data)
 
     def test_requires_authentication(self):
         self.client.force_authenticate(None)
@@ -220,7 +220,7 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
         other = User.objects.create_user(
             username='other', email='other@example.com', password=PASSWORD
         )
-        UserDetail.objects.create(
+        Submission.objects.create(
             user=other, problem=self.make_problem(), status='done', score=99
         )
 
@@ -256,7 +256,7 @@ class SubmissionDetailViewTests(ProblemsTestCase):
             'status': 'done', 'score': 70,
         }
         data.update(overrides)
-        return UserDetail.objects.create(**data)
+        return Submission.objects.create(**data)
 
     def test_requires_authentication(self):
         submission = self.make_submission()
@@ -277,7 +277,7 @@ class SubmissionDetailViewTests(ProblemsTestCase):
         other = User.objects.create_user(
             username='other', email='other@example.com', password=PASSWORD
         )
-        theirs = UserDetail.objects.create(
+        theirs = Submission.objects.create(
             user=other, problem=self.make_problem(), status='done', score=99
         )
 

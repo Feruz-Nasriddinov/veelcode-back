@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from users.models import UserDetail
+from users.models import Submission
 
 from .base import ProblemsTestCase
 
@@ -22,7 +22,7 @@ class SubmissionValidationTests(ProblemsTestCase):
         response, delay = self.submit(payload)
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(UserDetail.objects.count(), 0)
+        self.assertEqual(Submission.objects.count(), 0)
         delay.assert_not_called()
         return response
 
@@ -77,4 +77,4 @@ class SubmissionValidationTests(ProblemsTestCase):
         self.assertEqual(response.status_code, 202)
         submission_id, files = delay.call_args.kwargs['args']
         self.assertEqual(files, {'app/views.py': 'x = 1'})
-        self.assertEqual(submission_id, UserDetail.objects.get().id)
+        self.assertEqual(submission_id, Submission.objects.get().id)

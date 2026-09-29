@@ -26,7 +26,7 @@ class User(AbstractUser):
             models.UniqueConstraint(Lower('email'), name='user_email_lower_unique'),
         ]
 
-class UserDetail(models.Model):
+class Submission(models.Model):
     CHOICES = [
         ('pending', 'pending'),
         ('done', 'done'),

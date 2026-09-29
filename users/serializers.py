@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import UserDetail
+from .models import Submission
 from problems.serializers import ProblemSerializer
 
 class UserDetailSerializer(serializers.ModelSerializer):
     problem = ProblemSerializer(read_only = True)
 
     class Meta:
-        model = UserDetail
+        model = Submission
         fields = ['id', 'score', 'problem', 'status']

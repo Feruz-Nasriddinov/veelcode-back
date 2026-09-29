@@ -1,7 +1,7 @@
 import uuid
 from unittest.mock import patch
 
-from users.models import UserDetail
+from users.models import Submission
 
 from .base import ProblemsTestCase
 
@@ -10,7 +10,7 @@ class EvaluationTaskTests(ProblemsTestCase):
     def make_submission(self, **overrides):
         data = {'user': self.user, 'problem': self.make_problem(), 'status': 'pending'}
         data.update(overrides)
-        return UserDetail.objects.create(**data)
+        return Submission.objects.create(**data)
 
     def test_task_calls_the_evaluator_with_the_arguments_it_requires(self):
         from problems.tasks import evaluate_tasks
