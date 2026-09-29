@@ -19,7 +19,7 @@ from .serializers import (
 from .services.comments import comments_for_viewer
 from .tasks import evaluate_tasks
 from users.models import Submission
-from users.serializers import UserDetailSerializer
+from users.serializers import SubmissionSerializer
 
 class ProblemPagination(PageNumberPagination):
     max_page_size = 100
@@ -109,7 +109,7 @@ class SubmissionDetailView(APIView):
 
         submission = get_object_or_404(Submission, id = submission_id, user = request.user)
 
-        serializer = UserDetailSerializer(submission)
+        serializer = SubmissionSerializer(submission)
 
         return Response(serializer.data)
 
@@ -121,7 +121,7 @@ class SubmissionHistoryView(APIView):
 
         submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
 
-        data = UserDetailSerializer(submissions, many=True).data
+        data = SubmissionSerializer(submissions, many=True).data
 
         return Response(data)
 

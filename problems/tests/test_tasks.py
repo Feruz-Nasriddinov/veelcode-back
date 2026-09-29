@@ -118,7 +118,7 @@ class EvaluationTaskTests(ProblemsTestCase):
         evaluate.assert_not_called()
 
     def test_internal_errors_are_not_exposed_by_the_api(self):
-        from users.serializers import UserDetailSerializer
+        from users.serializers import SubmissionSerializer
 
         from problems.tasks import evaluate_tasks
 
@@ -130,7 +130,7 @@ class EvaluationTaskTests(ProblemsTestCase):
         submission.refresh_from_db()
         self.assertEqual(submission.status, 'failed')
 
-        data = UserDetailSerializer(submission).data
+        data = SubmissionSerializer(submission).data
         self.assertNotIn('error_message', data)
         self.assertNotIn('/srv/app/secret.py', str(data))
 
