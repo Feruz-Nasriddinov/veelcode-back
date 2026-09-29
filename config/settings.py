@@ -205,6 +205,8 @@ REST_FRAMEWORK = {
         'comments-read': '60/min',
         'like': '40/min',
         'unlike': '40/min',
+        'profile': '20/min',
+        'activity-track': '20/min',
     },
 }
 
