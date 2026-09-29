@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.test import override_settings
 
+from users.models import UserLocation
+
 from .base import ACCESS_COOKIE, REFRESH_COOKIE, SIGNUP_URL, VALID_PASSWORD, AuthTestCase
 
 User = get_user_model()
@@ -15,6 +17,16 @@ class SignupSuccessTests(AuthTestCase):
         self.assertEqual(response.data['username'], 'ryota')
         self.assertEqual(response.data['email'], 'ryota@example.com')
         self.assertTrue(User.objects.filter(username='ryota').exists())
+
+    def test_timezone_defaults_to_utc(self):
+        self.signup()
+
+        self.assertEqual(UserLocation.objects.get(user__username='ryota').timezone, 'UTC')
+
+    def test_stores_the_given_timezone(self):
+        self.signup(timezone='Asia/Tokyo')
+
+        self.assertEqual(UserLocation.objects.get(user__username='ryota').timezone, 'Asia/Tokyo')
 
     def test_password_is_hashed(self):
         self.signup()
@@ -108,6 +120,21 @@ class SignupValidationTests(AuthTestCase):
         response = self.signup(email='not-an-email')
 
         self.assertRejected(response, 'email')
+
+    def test_unknown_timezone(self):
+        response = self.signup(timezone='Mars/Olympus')
+
+        self.assertRejected(response, 'timezone')
+
+    def test_blank_timezone(self):
+        response = self.signup(timezone='')
+
+        self.assertRejected(response, 'timezone')
+
+    def test_timezone_path_traversal_is_rejected(self):
+        response = self.signup(timezone='../../etc/passwd')
+
+        self.assertRejected(response, 'timezone')
 
     def test_missing_fields(self):
         response = self.client.post(SIGNUP_URL, {'username': 'ryota'}, format='json')

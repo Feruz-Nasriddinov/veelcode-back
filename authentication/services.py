@@ -1,13 +1,19 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from users.models import UserLocation
+
 User = get_user_model()
 
 
-def create_user(*, username, email, password):
-    return User.objects.create_user(username=username, email=email, password=password)
+@transaction.atomic
+def create_user(*, username, email, password, timezone='UTC'):
+    user = User.objects.create_user(username=username, email=email, password=password)
+    UserLocation.objects.create(user=user, timezone=timezone)
+    return user
 
 
 def find_user_by_identifier(identifier):

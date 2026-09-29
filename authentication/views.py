@@ -41,6 +41,7 @@ class SignupView(PublicAPIView):
                 username=data['username'],
                 email=data['email'],
                 password=data['password'],
+                timezone=data['timezone'],
             )
         except IntegrityError:
             raise ValidationError({'detail': 'That username or email is already taken.'})
