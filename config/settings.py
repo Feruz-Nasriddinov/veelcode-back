@@ -195,7 +195,7 @@ REST_FRAMEWORK = {
         'send-content': '20/min',
         'send-score': '20/min',
         'submit': '10/min',
-        'submit-details': '20/min',
+        'submit-details': '40/min',
         'upload-problem': '3/min',
         'auth-signup': '10/hour',
         'auth-login': '10/min',
