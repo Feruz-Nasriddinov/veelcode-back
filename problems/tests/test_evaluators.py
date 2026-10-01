@@ -183,15 +183,31 @@ class BackendEvaluatorTests(EvaluatorTestCase):
         self.assertEqual(result, {'percentage': 0, 'status': 'out_of_memory'})
 
     def test_a_grader_still_running_at_the_deadline_is_a_timeout(self):
+        from itertools import chain, repeat
+
         from requests.exceptions import ReadTimeout
 
-        result = self.run_evaluation(
-            wait_exc=ReadTimeout('timed out'), grader_state={'Running': True}
-        )
+        with patch('problems.services.evaluators.base.time.monotonic', side_effect=chain([0], repeat(1000))):
+            result = self.run_evaluation(
+                wait_exc=ReadTimeout('timed out'), grader_state={'Running': True}
+            )
 
         self.assertEqual(result, {'percentage': 0, 'status': 'timeout'})
         self.grader.kill.assert_called_once()
         self.runner.remove.assert_called_once_with(force=True)
+
+    def test_an_app_that_exits_stops_the_grader_early(self):
+        from requests.exceptions import ReadTimeout
+
+        result = self.run_evaluation(
+            wait_exc=ReadTimeout('timed out'),
+            grader_state={'Running': True},
+            runner_state={'Running': False, 'ExitCode': 2},
+        )
+
+        self.assertEqual(result, {'percentage': 0, 'status': 'app_failed'})
+        self.grader.kill.assert_called_once()
+        self.assertEqual(self.grader.wait.call_count, 1)
 
     def test_a_grader_that_finished_during_the_timeout_is_still_scored(self):
         from requests.exceptions import ConnectionError

@@ -12,6 +12,7 @@ from requests.exceptions import ConnectionError as RequestsConnectionError, Read
 logger = logging.getLogger(__name__)
 
 CONTAINER_TIMEOUT_GRACE = 5
+RUNNER_POLL_SECONDS = 1
 APP_PORT = 8000
 APP_NOT_READY_EXIT_CODE = 90
 RESULTS_FILE = 'pytest-results.xml'
@@ -86,6 +87,7 @@ class _Run:
         self.network = None
         self.runner = None
         self.grader = None
+        self.runner_exited = False
 
     def execute(self):
         evaluator = self.evaluator
@@ -137,13 +139,14 @@ class _Run:
         )
 
         state = self._wait(self.grader)
-        if state is None:
+        if state is None and not self.runner_exited:
             return {'percentage': 0, 'status': 'timeout'}
 
+        state = state or {}
         runner_state = (_container_state(self.runner) or {}) if self.runner else {}
         if state.get('OOMKilled') or runner_state.get('OOMKilled'):
             return {'percentage': 0, 'status': 'out_of_memory'}
-        if state.get('ExitCode') == APP_NOT_READY_EXIT_CODE:
+        if self.runner_exited or state.get('ExitCode') == APP_NOT_READY_EXIT_CODE:
             return {'percentage': 0, 'status': 'app_failed'}
 
         results_file = self.grader_path / RESULTS_FILE
@@ -170,22 +173,35 @@ class _Run:
         )
 
     def _wait(self, container):
-        try:
-            container.wait(timeout=self.evaluator.timeout)
-            return _container_state(container) or {}
-        except (ReadTimeout, RequestsConnectionError) as e:
-            state = _container_state(container)
-            if state is None:
-                raise ContainerInfraError(f"Lost the Docker connection while waiting: {e}")
-            if state.get('Running'):
+        deadline = time.monotonic() + self.evaluator.timeout
+        while True:
+            poll = RUNNER_POLL_SECONDS if self.runner else self.evaluator.timeout
+            try:
+                container.wait(timeout=max(1, min(poll, deadline - time.monotonic())))
+                return _container_state(container) or {}
+            except (ReadTimeout, RequestsConnectionError) as e:
+                state = _container_state(container)
+                if state is None:
+                    raise ContainerInfraError(f"Lost the Docker connection while waiting: {e}")
+                if not state.get('Running'):
+                    return state
+                if self._runner_stopped():
+                    self.runner_exited = True
+                elif time.monotonic() < deadline:
+                    continue
                 try:
                     container.kill()
                 except docker.errors.APIError:
                     logger.warning(f"Failed to kill grader for problem {self.evaluator.problem.id}")
                 return None
-            return state
-        except docker.errors.APIError as e:
-            raise ContainerInfraError(f"Error while waiting on container: {e}")
+            except docker.errors.APIError as e:
+                raise ContainerInfraError(f"Error while waiting on container: {e}")
+
+    def _runner_stopped(self):
+        if self.runner is None:
+            return False
+        state = _container_state(self.runner)
+        return state is not None and not state.get('Running')
 
     def cleanup(self):
         for container in (self.grader, self.runner):

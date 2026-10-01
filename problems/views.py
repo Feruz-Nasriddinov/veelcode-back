@@ -81,19 +81,19 @@ class SubmitView(APIView):
         serializer = SubmissionFilesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        submission = Submission.objects.create(
+                user = request.user,
+                problem = problem,
+                status = 'pending'
+            )
         try:
-            with transaction.atomic():
-                submission = Submission.objects.create(
-                        user = request.user,
-                        problem = problem,
-                        status = 'pending'
-                    )
-                evaluate_tasks.apply_async(
-                    args=[submission.id, serializer.validated_data],
-                    time_limit = problem.time_required + 20,
-                    soft_time_limit = problem.time_required + 10,
-                )
+            evaluate_tasks.apply_async(
+                args=[submission.id, serializer.validated_data],
+                time_limit = problem.time_required + 20,
+                soft_time_limit = problem.time_required + 10,
+            )
         except OperationalError:
+            submission.delete()
             return Response(
                 {'message': 'Evaluation queue is unavailable, try again shortly'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
