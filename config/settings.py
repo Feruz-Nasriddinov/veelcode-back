@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import parse_qsl, unquote, urlsplit
 import os
 from dotenv import load_dotenv
 
@@ -15,6 +16,19 @@ def env_bool(name, default=False):
 
 def env_list(name):
     return [item.strip() for item in os.getenv(name, '').split(',') if item.strip()]
+
+
+def env_database(name):
+    url = urlsplit(os.getenv(name, ''))
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': unquote(url.path.lstrip('/')),
+        'USER': unquote(url.username or ''),
+        'PASSWORD': unquote(url.password or ''),
+        'HOST': url.hostname or '',
+        'PORT': str(url.port or ''),
+        'OPTIONS': dict(parse_qsl(url.query)),
+    }
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -79,10 +93,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env_database('DATABASE_URL'),
 }
 
 
