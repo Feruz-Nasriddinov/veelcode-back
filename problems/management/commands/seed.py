@@ -1110,7 +1110,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         if not settings.DEBUG:
             raise CommandError('Refusing to seed: DEBUG is off.')
-        password = os.environ.get('SEED_PASSWORD')
+        password = os.getenv('SEED_PASSWORD')
         if not password:
             raise CommandError('Set SEED_PASSWORD to the password the seed users should get.')
 
