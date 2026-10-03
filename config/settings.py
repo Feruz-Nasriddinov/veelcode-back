@@ -3,12 +3,13 @@ from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urlsplit
 import os
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv()
-
 
 def env_bool(name, default=False):
     return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'on'}
@@ -16,19 +17,6 @@ def env_bool(name, default=False):
 
 def env_list(name):
     return [item.strip() for item in os.getenv(name, '').split(',') if item.strip()]
-
-
-def env_database(name):
-    url = urlsplit(os.getenv(name, ''))
-    return {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': unquote(url.path.lstrip('/')),
-        'USER': unquote(url.username or ''),
-        'PASSWORD': unquote(url.password or ''),
-        'HOST': url.hostname or '',
-        'PORT': str(url.port or ''),
-        'OPTIONS': dict(parse_qsl(url.query)),
-    }
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
@@ -92,10 +80,17 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-DATABASES = {
-    'default': env_database('DATABASE_URL'),
-}
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
+if not DATABASE_URL:
+    raise ImproperlyConfigured(
+        'DATABASE_URL must be set. Add it to .env or the environment; '
+        'see .env.example.'
+    )
+
+DATABASES = {
+    "default": dj_database_url.parse(DATABASE_URL)
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
