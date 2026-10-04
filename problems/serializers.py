@@ -28,6 +28,11 @@ class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
 class ProblemFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProblemFile
+        fields = ['id', 'directory', 'content']
+        read_only_fields = ['id']
+
+class ProblemFileUploadSerializer(ProblemFileSerializer):
+    class Meta(ProblemFileSerializer.Meta):
         fields = ['id', 'directory', 'content', 'is_hidden']
 
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
