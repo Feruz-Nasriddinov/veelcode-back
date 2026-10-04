@@ -5,13 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.settings import api_settings
 
-from .models import Problem, ProblemFile, Comment
-
-class ProblemFileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProblemFile
-        fields = ['id', 'directory', 'content']
-        read_only_fields = ['id']
+from .models import Problem, ProblemFile, Comment, UpdateProblem
 
 class CommentAuthorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,8 +25,9 @@ class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
         model = Comment
         fields = ['id', 'text']
 
-class ProblemFileUploadSerializer(ProblemFileSerializer):
-    class Meta(ProblemFileSerializer.Meta):
+class ProblemFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProblemFile
         fields = ['id', 'directory', 'content', 'is_hidden']
 
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
@@ -48,6 +43,11 @@ class ProblemSerializer(serializers.ModelSerializer):
         model = Problem
         fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework']
         read_only_fields = ['id']
+
+class UpdateProblemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UpdateProblem
+        fields = ['id', 'new_content']
 
 class SubmissionFilesSerializer(serializers.Serializer):
     def to_internal_value(self, data):

@@ -70,6 +70,14 @@ class ProblemFile(models.Model):
     def __str__(self):
         return f'{self.problem.title}-{self.directory}'
 
+class UpdateProblem(models.Model):
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
+    problem_file = models.ForeignKey(ProblemFile, on_delete=models.CASCADE)
+    new_content = models.TextField()
+
+    def __str__(self):
+        return f'{self.problem.id}-{self.problem_file.directory}'
+
 class Comment(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name='comments')
