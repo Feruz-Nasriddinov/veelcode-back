@@ -53,6 +53,7 @@ class Problem(models.Model):
     field = models.CharField(choices=FIELD_CHOICES, max_length=8)
     language = models.CharField(choices=LANGUAGE_CHOICES, max_length=10)
     framework = models.CharField(choices=FRAMEWORK_CHOICES, max_length=50)
+    submission_count = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"{self.title}-{self.difficulty}"

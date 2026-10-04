@@ -35,7 +35,7 @@ class ProblemListView(APIView):
 
     def get(self, request):
 
-        problems = Problem.objects.filter(status='accepted').order_by('-created_at')
+        problems = Problem.objects.filter(status='accepted').order_by('-submission_count')
 
         paginator = ProblemPagination()
 
@@ -98,6 +98,8 @@ class SubmitView(APIView):
                 {'message': 'Evaluation queue is unavailable, try again shortly'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+        
+        Problem.objects.filter(id = problem_id).update(submission_count = F('submission_count') + 1)
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 
