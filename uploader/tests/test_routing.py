@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from django.test import TestCase
 
@@ -33,8 +34,8 @@ class UploaderRoutingTests(TestCase):
         self.assertEqual(len(routes), 1)
         self.assertEqual(set(routes[0].pattern.converters), {'problem_file_id'})
         self.assertTrue(
-            re.fullmatch(routes[0].pattern.converters['problem_file_id'].regex, '1'),
-            'problem_file_id must accept an integer ProblemFile id',
+            re.fullmatch(routes[0].pattern.converters['problem_file_id'].regex, str(uuid.uuid4())),
+            'problem_file_id must accept a UUID ProblemFile id',
         )
 
     def test_update_problem_throttle_scope_has_a_rate(self):

@@ -6,5 +6,5 @@ urlpatterns = [
     path('api/auth/', include('authentication.urls')),
     path('api/uploader/problem/', UploadProblemView.as_view()),
     path('api/uploader/problem/<uuid:problem_id>/content/', UploadProblemDetailView.as_view()),
-    path('api/uploader/content/<int:problem_file_id>/update/', UpdateUploadedProblemView.as_view()),
+    path('api/uploader/content/<uuid:problem_file_id>/update/', UpdateUploadedProblemView.as_view()),
 ]

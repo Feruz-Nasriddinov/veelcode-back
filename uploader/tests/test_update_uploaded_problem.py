@@ -1,3 +1,5 @@
+import uuid
+
 from problems.models import Problem, ProblemFile, UpdateProblem
 from users.models import User
 
@@ -82,7 +84,7 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
 
     def test_unknown_file_is_404(self):
         response = self.client.post(
-            self.update_url(999999), {'new_content': 'x = 2'}, format='json'
+            self.update_url(uuid.uuid4()), {'new_content': 'x = 2'}, format='json'
         )
 
         self.assertEqual(response.status_code, 404)
