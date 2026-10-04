@@ -207,6 +207,7 @@ REST_FRAMEWORK = {
         'unlike': '40/min',
         'profile': '20/min',
         'activity-track': '20/min',
+        'update-problem': '10/min',
     },
 }
 
