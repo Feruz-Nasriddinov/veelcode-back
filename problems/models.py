@@ -58,6 +58,11 @@ class Problem(models.Model):
         return f"{self.title}-{self.difficulty}"
 
 class ProblemFile(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=True
+    )
     problem = models.ForeignKey(
         Problem,
         on_delete=models.CASCADE,
