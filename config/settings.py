@@ -21,9 +21,11 @@ def env_list(name):
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-SECRET_KEY = os.getenv('SECRET_KEY', "django-test-secret-key")
-
 DEBUG = env_bool('DEBUG', False)
+
+SECRET_KEY = os.getenv('SECRET_KEY') or ("django-test-secret-key" if DEBUG else '')
+if not SECRET_KEY:
+    raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is False.')
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS')
 
@@ -188,9 +190,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
-    'DEFAULT_SCHEMA_CLASS': [
-        'drf_spectacular.openapi.AutoSchema',
-    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.ScopedRateThrottle',
     ],
@@ -245,3 +245,10 @@ CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = AUTH_COOKIE_SECURE
+SESSION_COOKIE_SECURE = AUTH_COOKIE_SECURE
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', AUTH_COOKIE_SECURE)
+SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', 3600 if AUTH_COOKIE_SECURE else 0))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', AUTH_COOKIE_SECURE)
+SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', False)
