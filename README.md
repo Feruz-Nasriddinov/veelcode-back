@@ -319,17 +319,6 @@ Never edit an applied migration — create a new one.
 
 ---
 
-## Known Gaps
-
-- [ ] Problem review happens only in the Django admin. There's no reviewer API.
-- [ ] `UpdateProblem` proposals aren't registered in the admin, and nothing applies them.
-- [ ] The upload API doesn't accept `time_required`, so new problems start with `0`.
-- [ ] Spring Boot / Java problems can be created but have no evaluator.
-- [ ] No Docker Compose for local dev (Django + Redis + Postgres + Celery).
-- [ ] No API docs (e.g. drf-spectacular / Swagger).
-
----
-
 ## License
 
 Proprietary — internal use only.
