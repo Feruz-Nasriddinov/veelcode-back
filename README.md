@@ -212,7 +212,7 @@ See `.env.example`. Origins must include the scheme (`https://...`), or Django r
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | insecure dev key | **Set in production.** Django secret key. |
+| `SECRET_KEY` | insecure dev key, only when `DEBUG=True` | **Required when `DEBUG=False`**, or Django refuses to start. |
 | `JWT_SIGNING_KEY` | insecure dev key | **Set in production.** Signs JWTs. |
 | `DEBUG` | `False` | Set `True` for local dev. |
 | `ALLOWED_HOSTS` | empty | Comma-separated. Required when `DEBUG=False`. |
@@ -223,7 +223,11 @@ See `.env.example`. Origins must include the scheme (`https://...`), or Django r
 | `CELERY_TASK_ALWAYS_EAGER` | `False` | Run tasks inside the request instead of a worker. |
 | `CORS_ALLOWED_ORIGINS` | empty | Comma-separated frontend origins. Credentials are allowed, so they must be exact. |
 | `CSRF_TRUSTED_ORIGINS` | empty | Usually the same as `CORS_ALLOWED_ORIGINS`. |
-| `AUTH_COOKIE_SECURE` | `False` | `True` in production. Also controls the CSRF cookie. |
+| `AUTH_COOKIE_SECURE` | `False` | `True` in production. Marks auth, CSRF and session cookies HTTPS-only, and sets the defaults of the `SECURE_*` settings below. |
+| `SECURE_SSL_REDIRECT` | `AUTH_COOKIE_SECURE` | Redirects HTTP to HTTPS. Trusts `X-Forwarded-Proto` from the proxy. |
+| `SECURE_HSTS_SECONDS` | `3600` if `AUTH_COOKIE_SECURE`, else `0` | Tells browsers to use HTTPS only, for this many seconds. Raise to `31536000` once HTTPS is confirmed working. |
+| `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `AUTH_COOKIE_SECURE` | Applies HSTS to subdomains too. |
+| `SECURE_HSTS_PRELOAD` | `False` | Only for an owned domain you will submit to the browser preload list. Hard to undo. |
 | `AUTH_COOKIE_DOMAIN` | none | Only for sharing cookies across subdomains. |
 | `EMAIL_BACKEND` | console if `DEBUG`, else SMTP | |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | `587`, TLS on | SMTP settings. |
