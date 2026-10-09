@@ -82,10 +82,10 @@ class SubmitView(APIView):
         serializer.is_valid(raise_exception=True)
 
         submission = Submission.objects.create(
-                user = request.user,
-                problem = problem,
-                status = 'pending'
-            )
+            problem = problem,
+            user = request.user,
+        )
+        
         try:
             evaluate_tasks.apply_async(
                 args=[submission.id, serializer.validated_data],
