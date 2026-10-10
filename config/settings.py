@@ -204,6 +204,7 @@ REST_FRAMEWORK = {
         'auth-signup': '10/hour',
         'auth-login': '10/min',
         'auth-refresh': '20/min',
+        'auth-social': '10/min',
         'history': '20/min',
         'comment': '20/min',
         'comments-read': '60/min',
@@ -237,6 +238,14 @@ AUTH_REFRESH_COOKIE_PATH = '/api/auth/'
 AUTH_COOKIE_SAMESITE = 'Lax'
 AUTH_COOKIE_DOMAIN = os.getenv('AUTH_COOKIE_DOMAIN') or None
 AUTH_COOKIE_SECURE = env_bool('AUTH_COOKIE_SECURE', False)
+
+GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv('GOOGLE_OAUTH_REDIRECT_URI', '')
+
+GITHUB_OAUTH_CLIENT_ID = os.getenv('GITHUB_OAUTH_CLIENT_ID', '')
+GITHUB_OAUTH_CLIENT_SECRET = os.getenv('GITHUB_OAUTH_CLIENT_SECRET', '')
+GITHUB_OAUTH_REDIRECT_URI = os.getenv('GITHUB_OAUTH_REDIRECT_URI', '')
 
 
 CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
