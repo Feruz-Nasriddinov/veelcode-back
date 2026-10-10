@@ -38,6 +38,15 @@ Platform where users get a real, broken or incomplete codebase and must fix a bu
 - Don't commit unless I ask.
 - Don't write comments.
 
+## Code style
+
+- Write the smallest implementation that fully solves the task.
+- Prefer deleting code, dependencies, abstractions, and configuration over adding them.
+- Use clear names; avoid clever one-liners and premature abstraction.
+- No speculative features, unused parameters, wrapper classes, or “just in case” error handling.
+- Follow existing project patterns before introducing new ones.
+- Before finishing, remove dead code, duplicate logic, and unnecessary dependencies.
+
 ## Backend conventions
 
 <!-- Edit these to match what the repo actually does. Delete what's wrong. -->
