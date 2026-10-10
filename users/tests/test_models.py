@@ -2,7 +2,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from users.models import User, Submission, UserLocation
+from users.models import SocialAccount, User, Submission, UserLocation
 
 from .base import PASSWORD, UsersTestCase
 
@@ -137,3 +137,46 @@ class UserLocationModelTests(UsersTestCase):
         location = UserLocation.objects.create(user=self.user)
 
         self.assertEqual(self.user.location, location)
+
+
+class SocialAccountModelTests(UsersTestCase):
+    def make_account(self, user=None, provider=SocialAccount.GOOGLE, provider_user_id='1234567890'):
+        return SocialAccount.objects.create(
+            user=user or self.user, provider=provider, provider_user_id=provider_user_id
+        )
+
+    def test_str(self):
+        self.assertEqual(str(self.make_account()), 'ryota - google')
+
+    def test_related_name(self):
+        account = self.make_account()
+
+        self.assertEqual(list(self.user.social_accounts.all()), [account])
+
+    def test_one_user_can_link_both_providers(self):
+        self.make_account(provider=SocialAccount.GOOGLE)
+        self.make_account(provider=SocialAccount.GITHUB, provider_user_id='42')
+
+        self.assertEqual(self.user.social_accounts.count(), 2)
+
+    def test_the_same_id_on_a_different_provider_is_allowed(self):
+        self.make_account(provider=SocialAccount.GOOGLE, provider_user_id='42')
+        self.make_account(provider=SocialAccount.GITHUB, provider_user_id='42')
+
+        self.assertEqual(SocialAccount.objects.filter(provider_user_id='42').count(), 2)
+
+    def test_one_provider_account_cannot_be_linked_to_two_users(self):
+        self.make_account()
+
+        with transaction.atomic():
+            with self.assertRaises(IntegrityError):
+                self.make_account(user=self.other)
+
+    def test_deleting_the_user_deletes_their_links(self):
+        # self.other rather than self.user: Problem.created_by is PROTECT, and
+        # the fixture's problem belongs to self.user.
+        self.make_account(user=self.other)
+
+        self.other.delete()
+
+        self.assertEqual(SocialAccount.objects.count(), 0)

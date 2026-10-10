@@ -14,6 +14,8 @@ REFRESH_URL = '/api/auth/refresh/'
 LOGOUT_URL = '/api/auth/logout/'
 ME_URL = '/api/auth/me/'
 CSRF_URL = '/api/auth/csrf/'
+GOOGLE_URL = '/api/auth/google/'
+GITHUB_URL = '/api/auth/github/'
 
 VALID_PASSWORD = 'Sup3rSecret!pass'
 
@@ -46,6 +48,9 @@ class AuthTestCase(TestCase):
         return self.client.post(
             LOGIN_URL, {'identifier': identifier, 'password': password}, format='json'
         )
+
+    def social_login(self, url=GOOGLE_URL, code='auth-code'):
+        return self.client.post(url, {'code': code}, format='json')
 
     def cookie(self, response, name):
         return response.cookies.get(name)

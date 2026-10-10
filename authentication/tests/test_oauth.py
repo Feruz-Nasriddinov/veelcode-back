@@ -6,12 +6,16 @@ from django.test import override_settings
 
 from users.models import SocialAccount, UserLocation
 
-from .base import ACCESS_COOKIE, REFRESH_COOKIE, VALID_PASSWORD, AuthTestCase
+from .base import (
+    ACCESS_COOKIE,
+    GITHUB_URL,
+    GOOGLE_URL,
+    REFRESH_COOKIE,
+    VALID_PASSWORD,
+    AuthTestCase,
+)
 
 User = get_user_model()
-
-GOOGLE_URL = '/api/auth/google/'
-GITHUB_URL = '/api/auth/github/'
 
 GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
@@ -80,15 +84,12 @@ class SocialLoginTestCase(AuthTestCase):
         routes.update(overrides)
         return routes
 
-    def login_with(self, url, code='auth-code'):
-        return self.client.post(url, {'code': code}, format='json')
-
 
 class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_creates_user_and_sets_cookies(self):
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(set(response.data.keys()), {'id', 'username', 'email'})
@@ -99,7 +100,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_stores_the_provider_identity(self):
         self.mock_provider(self.google_routes())
 
-        self.login_with(GOOGLE_URL)
+        self.social_login(GOOGLE_URL)
 
         account = SocialAccount.objects.get(provider='google')
         self.assertEqual(account.provider_user_id, '1234567890')
@@ -108,7 +109,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_new_user_has_no_usable_password_and_a_location(self):
         self.mock_provider(self.google_routes())
 
-        self.login_with(GOOGLE_URL)
+        self.social_login(GOOGLE_URL)
 
         user = User.objects.get(email='ryota@example.com')
         self.assertFalse(user.has_usable_password())
@@ -117,7 +118,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_username_comes_from_the_email_local_part(self):
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertEqual(response.data['username'], 'ryota')
 
@@ -125,15 +126,15 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
         self.create_user(username='ryota', email='taken@example.com')
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertEqual(response.data['username'], 'ryota2')
 
     def test_second_login_reuses_the_same_user(self):
         self.mock_provider(self.google_routes())
 
-        first = self.login_with(GOOGLE_URL)
-        second = self.login_with(GOOGLE_URL)
+        first = self.social_login(GOOGLE_URL)
+        second = self.social_login(GOOGLE_URL)
 
         self.assertEqual(first.data['id'], second.data['id'])
         self.assertEqual(User.objects.count(), 1)
@@ -143,7 +144,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
         user = self.create_user(username='ryota', email='ryota@example.com')
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertEqual(response.data['id'], user.id)
         self.assertEqual(User.objects.count(), 1)
@@ -152,7 +153,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_password_login_still_works_after_linking(self):
         self.create_user(username='ryota', email='ryota@example.com')
         self.mock_provider(self.google_routes())
-        self.login_with(GOOGLE_URL)
+        self.social_login(GOOGLE_URL)
 
         response = self.login(identifier='ryota', password=VALID_PASSWORD)
 
@@ -161,7 +162,7 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
     def test_no_token_in_response_body(self):
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
         body = response.content.decode()
 
         self.assertNotIn('google-access-token', body)
@@ -186,14 +187,14 @@ class GoogleLoginFailureTests(SocialLoginTestCase):
             self.google_routes(**{GOOGLE_TOKEN_URL: {'error': 'invalid_grant'}})
         )
 
-        self.assertRejected(self.login_with(GOOGLE_URL))
+        self.assertRejected(self.social_login(GOOGLE_URL))
 
     def test_rejected_token_exchange(self):
         self.mock_provider(
             self.google_routes(**{GOOGLE_TOKEN_URL: FakeResponse({'error': 'bad'}, 401)})
         )
 
-        self.assertRejected(self.login_with(GOOGLE_URL))
+        self.assertRejected(self.social_login(GOOGLE_URL))
 
     def test_unverified_email(self):
         self.mock_provider(
@@ -208,7 +209,7 @@ class GoogleLoginFailureTests(SocialLoginTestCase):
             )
         )
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertRejected(response)
         self.assertEqual(
@@ -220,20 +221,20 @@ class GoogleLoginFailureTests(SocialLoginTestCase):
             self.google_routes(**{GOOGLE_TOKEN_URL: requests.ConnectionError('boom')})
         )
 
-        self.assertRejected(self.login_with(GOOGLE_URL))
+        self.assertRejected(self.social_login(GOOGLE_URL))
 
     def test_unreadable_response(self):
         self.mock_provider(
             self.google_routes(**{GOOGLE_TOKEN_URL: FakeResponse(None)})
         )
 
-        self.assertRejected(self.login_with(GOOGLE_URL))
+        self.assertRejected(self.social_login(GOOGLE_URL))
 
     @override_settings(GOOGLE_OAUTH_CLIENT_SECRET='')
     def test_provider_not_configured(self):
         self.mock_provider({})
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertRejected(response)
         self.assertEqual(response.data['detail'], 'This login provider is not configured.')
@@ -244,7 +245,7 @@ class GoogleLoginFailureTests(SocialLoginTestCase):
         user.save(update_fields=['is_active'])
         self.mock_provider(self.google_routes())
 
-        response = self.login_with(GOOGLE_URL)
+        response = self.social_login(GOOGLE_URL)
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['detail'], 'This account is not active.')
@@ -255,7 +256,7 @@ class GithubLoginTests(SocialLoginTestCase):
     def test_uses_the_primary_verified_email(self):
         self.mock_provider(self.github_routes())
 
-        response = self.login_with(GITHUB_URL)
+        response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['email'], 'ryota@example.com')
@@ -274,7 +275,7 @@ class GithubLoginTests(SocialLoginTestCase):
             )
         )
 
-        response = self.login_with(GITHUB_URL)
+        response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['email'], 'backup@example.com')
@@ -282,17 +283,17 @@ class GithubLoginTests(SocialLoginTestCase):
     def test_stores_the_provider_identity(self):
         self.mock_provider(self.github_routes())
 
-        self.login_with(GITHUB_URL)
+        self.social_login(GITHUB_URL)
 
         account = SocialAccount.objects.get(provider='github')
         self.assertEqual(account.provider_user_id, '42')
 
     def test_google_and_github_accounts_share_one_user(self):
         self.mock_provider(self.github_routes())
-        github = self.login_with(GITHUB_URL)
+        github = self.social_login(GITHUB_URL)
 
         self.mock_provider(self.google_routes())
-        google = self.login_with(GOOGLE_URL)
+        google = self.social_login(GOOGLE_URL)
 
         self.assertEqual(github.data['id'], google.data['id'])
         self.assertEqual(User.objects.count(), 1)
@@ -309,7 +310,7 @@ class GithubLoginTests(SocialLoginTestCase):
             )
         )
 
-        response = self.login_with(GITHUB_URL)
+        response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
@@ -322,7 +323,7 @@ class GithubLoginTests(SocialLoginTestCase):
             self.github_routes(**{GITHUB_TOKEN_URL: {'error': 'bad_verification_code'}})
         )
 
-        response = self.login_with(GITHUB_URL)
+        response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
@@ -333,6 +334,6 @@ class GithubLoginTests(SocialLoginTestCase):
     def test_username_falls_back_when_login_is_missing(self):
         self.mock_provider(self.github_routes(**{GITHUB_USER_URL: {'id': 42}}))
 
-        response = self.login_with(GITHUB_URL)
+        response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.data['username'], 'user')
