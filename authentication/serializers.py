@@ -61,3 +61,7 @@ class SignupSerializer(serializers.Serializer):
 class LoginSerializer(serializers.Serializer):
     identifier = serializers.CharField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+
+class OAuthCodeSerializer(serializers.Serializer):
+    code = serializers.CharField(trim_whitespace=True)

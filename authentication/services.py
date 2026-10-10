@@ -1,10 +1,14 @@
+import re
+
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import UserLocation
+from users.models import SocialAccount, UserLocation
+
+from .oauth import PROFILE_FETCHERS, OAuthError
 
 User = get_user_model()
 
@@ -71,3 +75,50 @@ def blacklist_refresh_token(raw_refresh):
     except TokenError:
         return False
     return True
+
+
+def unique_username(seed):
+    base = re.sub(r'[^\w.+-]', '', (seed or '').strip())[:140] or 'user'
+    username = base
+    suffix = 1
+    while User.objects.filter(username__iexact=username).exists():
+        suffix += 1
+        username = f'{base}{suffix}'
+    return username
+
+
+@transaction.atomic
+def link_social_account(*, provider, provider_user_id, email, username_seed):
+    account = (
+        SocialAccount.objects
+        .select_related('user')
+        .filter(provider=provider, provider_user_id=provider_user_id)
+        .first()
+    )
+    if account is not None:
+        return account.user
+
+    email = User.objects.normalize_email(email.strip())
+    user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        user = User.objects.create_user(
+            username=unique_username(username_seed),
+            email=email,
+            password=None,
+        )
+        UserLocation.objects.create(user=user)
+
+    SocialAccount.objects.create(
+        user=user,
+        provider=provider,
+        provider_user_id=provider_user_id,
+    )
+    return user
+
+
+def authenticate_social_user(*, provider, code):
+    profile = PROFILE_FETCHERS[provider](code)
+    user = link_social_account(**profile)
+    if not api_settings.USER_AUTHENTICATION_RULE(user):
+        raise OAuthError('This account is not active.')
+    return user

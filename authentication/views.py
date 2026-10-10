@@ -13,7 +13,13 @@ from rest_framework_simplejwt.exceptions import TokenError
 from . import services
 from .authentication import enforce_csrf
 from .cookies import clear_auth_cookies, set_auth_cookies
-from .serializers import LoginSerializer, PublicUserSerializer, SignupSerializer
+from .oauth import OAuthError
+from .serializers import (
+    LoginSerializer,
+    OAuthCodeSerializer,
+    PublicUserSerializer,
+    SignupSerializer,
+)
 
 
 class PublicAPIView(APIView):
@@ -69,6 +75,30 @@ class LoginView(PublicAPIView):
                 {'detail': 'Invalid credentials'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
+
+        access, refresh = services.issue_tokens(user)
+        response = Response(PublicUserSerializer(user).data, status=status.HTTP_200_OK)
+        return set_auth_cookies(response, access, refresh)
+
+
+@method_decorator(sensitive_post_parameters('code'), name='dispatch')
+class SocialLoginView(PublicAPIView):
+    throttle_scope = 'auth-social'
+    provider = None
+
+    def post(self, request):
+        serializer = OAuthCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            user = services.authenticate_social_user(
+                provider=self.provider,
+                code=serializer.validated_data['code'],
+            )
+        except OAuthError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError:
+            raise ValidationError({'detail': 'That username or email is already taken.'})
 
         access, refresh = services.issue_tokens(user)
         response = Response(PublicUserSerializer(user).data, status=status.HTTP_200_OK)

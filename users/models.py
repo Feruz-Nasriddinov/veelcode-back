@@ -61,3 +61,31 @@ class UserLocation(models.Model):
 
     def __str__(self):
         return f'{self.user.username} - {self.timezone}'
+
+class SocialAccount(models.Model):
+    GOOGLE = 'google'
+    GITHUB = 'github'
+    PROVIDERS = [
+        (GOOGLE, 'Google'),
+        (GITHUB, 'GitHub'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='social_accounts'
+    )
+    provider = models.CharField(choices=PROVIDERS, max_length=20)
+    provider_user_id = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['provider', 'provider_user_id'],
+                name='social_account_provider_user_unique',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.user.username} - {self.provider}'
