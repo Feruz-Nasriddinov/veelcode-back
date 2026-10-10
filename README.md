@@ -55,6 +55,8 @@ Every endpoint needs a logged-in user unless marked **public**. Rate limits come
 | `GET` | `/api/auth/csrf/` | **Public.** Sets the `csrftoken` cookie. Call this first. |
 | `POST` | `/api/auth/signup/` | **Public.** `username`, `email`, `password`, `password_confirmation`, optional `timezone` (default `UTC`). Sets auth cookies. |
 | `POST` | `/api/auth/login/` | **Public.** `identifier` (username or email) + `password`. Sets auth cookies. |
+| `POST` | `/api/auth/google/` | **Public.** `code` from Google's redirect. Creates or links an account and sets auth cookies. |
+| `POST` | `/api/auth/github/` | **Public.** `code` from GitHub's redirect. Creates or links an account and sets auth cookies. |
 | `POST` | `/api/auth/refresh/` | **Public.** Uses the refresh cookie to issue new tokens; the old refresh token is blacklisted. |
 | `POST` | `/api/auth/logout/` | **Public.** Blacklists the refresh token and clears both cookies. |
 | `GET` | `/api/auth/me/` | Current user (`id`, `username`, `email`). |
@@ -229,6 +231,8 @@ See `.env.example`. Origins must include the scheme (`https://...`), or Django r
 | `SECURE_HSTS_INCLUDE_SUBDOMAINS` | `AUTH_COOKIE_SECURE` | Applies HSTS to subdomains too. |
 | `SECURE_HSTS_PRELOAD` | `False` | Only for an owned domain you will submit to the browser preload list. Hard to undo. |
 | `AUTH_COOKIE_DOMAIN` | none | Only for sharing cookies across subdomains. |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` | empty | Google sign-in. Scopes `openid email`. Unset means `/api/auth/google/` answers `400`. |
+| `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, `GITHUB_OAUTH_REDIRECT_URI` | empty | GitHub sign-in. Scopes `read:user user:email`. Unset means `/api/auth/github/` answers `400`. |
 | `EMAIL_BACKEND` | console if `DEBUG`, else SMTP | |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` | `587`, TLS on | SMTP settings. |
 | `SEED_PASSWORD` | — | Only for `manage.py seed`. |
@@ -256,6 +260,7 @@ Defined in `config/settings.py` under `REST_FRAMEWORK.DEFAULT_THROTTLE_RATES`, a
 | `auth-signup` | 10/hour | Signup |
 | `auth-login` | 10/min | Login |
 | `auth-refresh` | 20/min | Refresh |
+| `auth-social` | 10/min | Google and GitHub sign-in |
 
 `send-score` is defined but no view uses it.
 
