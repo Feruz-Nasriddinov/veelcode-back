@@ -30,6 +30,7 @@ class UploaderTestCase(TestCase):
             'field': 'backend',
             'language': 'python',
             'framework': 'django',
+            'source': 'https://github.com/acme/cache-service',
         }
         data.update(overrides)
         return data
