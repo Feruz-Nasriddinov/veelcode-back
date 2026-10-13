@@ -29,6 +29,7 @@ class ProblemsTestCase(TestCase):
             'field': 'backend',
             'language': 'python',
             'framework': 'django',
+            'source': 'https://github.com/acme/cache-service',
             'created_by': self.user,
         }
         data.update(overrides)

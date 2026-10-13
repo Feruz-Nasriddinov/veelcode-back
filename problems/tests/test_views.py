@@ -32,7 +32,7 @@ class ProblemListViewTests(ProblemsTestCase):
 
         self.assertEqual(response.data['results'], [])
 
-    def test_list_exposes_field_language_and_framework(self):
+    def test_list_exposes_field_language_framework_and_source(self):
         self.make_problem(field='devops', language='golang', framework='next.js')
 
         row = self.client.get(self.url).data['results'][0]
@@ -40,6 +40,7 @@ class ProblemListViewTests(ProblemsTestCase):
         self.assertEqual(row['field'], 'devops')
         self.assertEqual(row['language'], 'golang')
         self.assertEqual(row['framework'], 'next.js')
+        self.assertEqual(row['source'], 'https://github.com/acme/cache-service')
 
     def test_list_does_not_leak_problem_files(self):
         problem = self.make_problem()
@@ -68,6 +69,7 @@ class ProblemDetailViewTests(ProblemsTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['title'], 'Fix the cache')
+        self.assertEqual(response.data['source'], 'https://github.com/acme/cache-service')
         self.assertEqual(len(response.data['files']), 1)
         self.assertEqual(response.data['files'][0]['directory'], 'app/views.py')
 
