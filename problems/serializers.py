@@ -41,12 +41,12 @@ class ProblemWithFilesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework', 'comment_count']
+        fields = ['id', 'title', 'description', 'files', 'difficulty', 'field', 'language', 'framework', 'comment_count', 'source']
 
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework']
+        fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework', 'source']
         read_only_fields = ['id']
 
 class UpdateProblemSerializer(serializers.ModelSerializer):
