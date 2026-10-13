@@ -95,9 +95,11 @@ Submission limits (`config/settings.py`): at most 200 files, paths up to 255 cha
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/uploader/problem/` | Create a problem (`title`, `description`, `difficulty`, `field`, `language`, `framework`). It starts as `pending`. |
+| `POST` | `/api/uploader/problem/` | Create a problem (`title`, `description`, `difficulty`, `field`, `language`, `framework`, `source`). It starts as `pending`. |
 | `POST` | `/api/uploader/problem/<problem_id>/content/` | Add a file (`directory`, `content`, `is_hidden`) to your own pending problem. |
 | `POST` | `/api/uploader/problem/<problem_file_id>/content/update/` | Propose new content for a file in your problem. Saved as an `UpdateProblem` record; the file itself isn't changed. |
+
+`source` is required and says where the codebase came from: either the URL of the public GitHub repo it was taken from, or, if the repo is private, a short description of that repo.
 
 Problems are accepted or rejected by changing `status` in the Django admin (`/admin/`). Set `time_required` there too: the upload API doesn't accept it and the default is `0`.
 
@@ -274,7 +276,7 @@ Defined in `config/settings.py` under `REST_FRAMEWORK.DEFAULT_THROTTLE_RATES`, a
 
 **`users.Submission`** — `id` (UUID), `user`, `problem`, `score` (0–100), `status` (`pending` / `done` / `failed`), `error_message`, `created_at`.
 
-**`problems.Problem`** — `id` (UUID), `title`, `description`, `difficulty` (easy/medium/hard), `field` (backend/frontend/devops), `language`, `framework`, `time_required` (seconds, default 0), `status` (pending/accepted/rejected), `submission_count`, `created_by` (`PROTECT`: a user who created problems can't be deleted), `created_at`.
+**`problems.Problem`** — `id` (UUID), `title`, `description`, `difficulty` (easy/medium/hard), `field` (backend/frontend/devops), `language`, `framework`, `source` (public GitHub repo URL, or a description of the private repo; max 255 characters), `time_required` (seconds, default 0), `status` (pending/accepted/rejected), `submission_count`, `created_by` (`PROTECT`: a user who created problems can't be deleted), `created_at`.
 
 **`problems.ProblemFile`** — `id` (UUID), `problem`, `directory` (file path), `content`, `is_hidden` (hidden test files, never sent to users).
 
