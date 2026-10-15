@@ -7,7 +7,7 @@ class SubmissionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Submission
-        fields = ['id', 'score', 'problem', 'status']
+        fields = ['id', 'score', 'problem', 'status', 'created_at']
 
 class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source = 'user.username', read_only=True)
