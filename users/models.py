@@ -7,8 +7,8 @@ from problems.models import Problem
 import uuid
 
 username_validator = RegexValidator(
-    regex=r'^[\w.+-]+\Z',
-    message='Username may contain letters, digits and . + - _ only. "@" is not allowed.',
+    regex=r'^[A-Za-z0-9_.+-]+\Z',
+    message='Username may contain English letters, digits and . + - _ only. "@" is not allowed.',
 )
 
 class User(AbstractUser):
