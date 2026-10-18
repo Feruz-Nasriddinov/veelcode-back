@@ -4,11 +4,14 @@ COPY_TO_WORKSPACE = 'find /app -mindepth 1 -maxdepth 1 ! -name node_modules -exe
 
 class FrontendEvaluator(Evaluator):
     runner_image = 'veelcode-frontend-runner'
-    runner_mem_limit = '1g'
+    runner_read_only = False
+    runner_nano_cpus = 2_000_000_000
+    runner_mem_limit = '2g'
     runner_pids_limit = 256
     grader_image = 'veelcode-frontend-grader'
     grader_mem_limit = '1g'
     grader_pids_limit = 256
+    grader_nano_cpus = 2_000_000_000
 
     def grader_args(self, app_url):
         return ['--base-url', app_url, '--browser', 'chromium']

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path, PurePosixPath
 
 import docker
+from django.conf import settings
 from requests.exceptions import ConnectionError as RequestsConnectionError, ReadTimeout
 
 logger = logging.getLogger(__name__)
@@ -23,15 +24,35 @@ EXPIRES_LABEL = 'veelcode.expires_at'
 class ContainerInfraError(Exception):
     pass
 
+CPU_LIMIT = 1_000_000_000
+
+
+def container_ids():
+    if os.getuid() == 0:
+        return settings.EVALUATOR_FALLBACK_UID, settings.EVALUATOR_FALLBACK_UID
+    return os.getuid(), os.getgid()
+
+
+def hand_over(root, uid, gid):
+    if os.getuid() != 0:
+        return
+    for path in [root, *root.rglob('*')]:
+        os.chown(path, uid, gid)
+
+
 class Evaluator:
     runner_image = None
-    runner_mount_mode = 'ro'
+    runner_mount_path = '/app'
+    runner_workspace_in_memory = False
+    runner_read_only = True
     runner_mem_limit = '512m'
     runner_pids_limit = 128
+    runner_nano_cpus = CPU_LIMIT
 
     grader_image = None
     grader_mem_limit = '512m'
     grader_pids_limit = 128
+    grader_nano_cpus = CPU_LIMIT
 
     def __init__(self, problem):
         self.problem = problem
@@ -59,6 +80,9 @@ class Evaluator:
             grader_path = Path(grader_dir).resolve()
             write_files(submission_path, files)
             write_files(grader_path, hidden_files)
+            uid, gid = container_ids()
+            hand_over(submission_path, uid, gid)
+            hand_over(grader_path, uid, gid)
 
             try:
                 client = docker.from_env()
@@ -104,15 +128,21 @@ class _Run:
             network_options = {'network': self.network.name}
             app_name = f'veelcode-app-{self.run_id}'
             app_url = f'http://{app_name}:{APP_PORT}'
+            tmpfs = {'/tmp': f'size={settings.EVALUATOR_TMP_SIZE},mode=1777'}
+            if evaluator.runner_workspace_in_memory:
+                tmpfs['/app'] = f'size={settings.EVALUATOR_WORKSPACE_SIZE},mode=1777'
             self.runner = self._start(
                 evaluator.runner_image,
                 evaluator.runner_command(),
                 name=app_name,
-                volumes={str(self.submission_path): {'bind': '/app', 'mode': evaluator.runner_mount_mode}},
+                volumes={str(self.submission_path): {'bind': evaluator.runner_mount_path, 'mode': 'ro'}},
                 working_dir='/app',
                 environment={'HOME': '/tmp', 'PYTHONDONTWRITEBYTECODE': '1'},
                 mem_limit=evaluator.runner_mem_limit,
                 pids_limit=evaluator.runner_pids_limit,
+                nano_cpus=evaluator.runner_nano_cpus,
+                read_only=evaluator.runner_read_only,
+                tmpfs=tmpfs,
                 **network_options,
             )
             environment['APP_URL'] = app_url
@@ -135,6 +165,9 @@ class _Run:
             environment=environment,
             mem_limit=evaluator.grader_mem_limit,
             pids_limit=evaluator.grader_pids_limit,
+            nano_cpus=evaluator.grader_nano_cpus,
+            read_only=True,
+            tmpfs={'/tmp': f'size={settings.EVALUATOR_TMP_SIZE},mode=1777'},
             **network_options,
         )
 
@@ -161,14 +194,19 @@ class _Run:
         except docker.errors.DockerException as e:
             raise ContainerInfraError(f"Docker call failed: {e}")
 
-    def _start(self, image, command, **kwargs):
+    def _start(self, image, command, mem_limit, **kwargs):
+        uid, gid = container_ids()
         return self._call(
             self.client.containers.run,
             image,
             command,
-            user=f'{os.getuid()}:{os.getgid()}',
+            user=f'{uid}:{gid}',
             labels=self.labels,
             detach=True,
+            mem_limit=mem_limit,
+            memswap_limit=mem_limit,
+            cap_drop=['ALL'],
+            security_opt=['no-new-privileges'],
             **kwargs,
         )
 

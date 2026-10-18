@@ -110,14 +110,14 @@ class BackendEvaluatorTests(EvaluatorTestCase):
     def test_submitted_files_never_reach_the_grader(self):
         self.run_evaluation({'app.py': 'x = 1', 'conftest.py': 'evil'})
 
-        self.assertEqual(self.calls['runner']['mounts']['/app'], {'app.py': 'x = 1', 'conftest.py': 'evil'})
+        self.assertEqual(self.calls['runner']['mounts']['/src'], {'app.py': 'x = 1', 'conftest.py': 'evil'})
         self.assertEqual(list(self.calls['grader']['mounts']), ['/grader'])
         self.assertEqual(list(self.calls['grader']['mounts']['/grader']), ['test_hidden.py'])
 
     def test_hidden_tests_never_reach_the_app(self):
         self.run_evaluation({'app.py': 'x = 1'})
 
-        self.assertNotIn('test_hidden.py', self.calls['runner']['mounts']['/app'])
+        self.assertNotIn('test_hidden.py', self.calls['runner']['mounts']['/src'])
 
     def test_only_hidden_test_modules_are_passed_to_pytest(self):
         problem = self.make_problem_with_hidden_tests({
@@ -138,6 +138,35 @@ class BackendEvaluatorTests(EvaluatorTestCase):
                 kwargs = self.calls[role]['kwargs']
                 self.assertTrue(kwargs['mem_limit'])
                 self.assertTrue(kwargs['pids_limit'])
+
+    def test_every_container_is_locked_down(self):
+        self.run_evaluation()
+
+        for role in ('runner', 'grader'):
+            with self.subTest(role=role):
+                kwargs = self.calls[role]['kwargs']
+                self.assertEqual(kwargs['cap_drop'], ['ALL'])
+                self.assertIn('no-new-privileges', kwargs['security_opt'])
+                self.assertEqual(kwargs['memswap_limit'], kwargs['mem_limit'])
+                self.assertTrue(kwargs['nano_cpus'])
+                self.assertIn('size=', kwargs['tmpfs']['/tmp'])
+
+    def test_the_submission_is_mounted_read_only_and_copied_into_a_size_capped_workspace(self):
+        self.run_evaluation()
+
+        runner = self.calls['runner']['kwargs']
+        self.assertEqual([v['mode'] for v in runner['volumes'].values()], ['ro'])
+        self.assertIn('size=128m', runner['tmpfs']['/app'])
+        self.assertTrue(runner['read_only'])
+
+    def test_containers_never_run_as_root(self):
+        with patch('problems.services.evaluators.base.os.getuid', return_value=0), \
+                patch('problems.services.evaluators.base.hand_over'):
+            self.run_evaluation()
+
+        for role in ('runner', 'grader'):
+            with self.subTest(role=role):
+                self.assertEqual(self.calls[role]['kwargs']['user'], '65534:65534')
 
     def test_containers_and_network_are_removed(self):
         self.run_evaluation(report='<testsuite tests="1"/>')
