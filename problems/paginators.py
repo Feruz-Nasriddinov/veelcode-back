@@ -10,4 +10,4 @@ class CommentPagination(PageNumberPagination):
 
 class HistoryPagination(PageNumberPagination):
     max_page_size = 100
-    max_size = 20
+    page_size = 20
