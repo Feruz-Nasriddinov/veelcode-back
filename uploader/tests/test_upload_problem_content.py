@@ -1,4 +1,7 @@
 import uuid
+from unittest.mock import patch
+
+from rest_framework.throttling import ScopedRateThrottle
 
 from problems.models import Problem, ProblemFile
 from users.models import User
@@ -106,6 +109,55 @@ class UploadProblemDetailViewTests(UploaderTestCase):
 
         response = self.client.post(
             self.files_url(self.problem.id), self.file_payload(), format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+
+class UploadProblemFileLimitTests(UploaderTestCase):
+    def setUp(self):
+        super().setUp()
+        patcher = patch.dict(ScopedRateThrottle.THROTTLE_RATES, {'upload-problem': '1000/min'})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.problem = Problem.objects.create(
+            title='Fix the cache', description='A broken cache layer',
+            difficulty='medium', status='pending', created_by=self.user,
+            field='backend', language='python', framework='django',
+        )
+
+    def upload(self, **overrides):
+        data = {'directory': 'app/views.py', 'content': 'x = 1'}
+        data.update(overrides)
+        return self.client.post(self.files_url(self.problem.id), data, format='json')
+
+    def test_path_traversal_in_directory_is_rejected(self):
+        for directory in ('../escape.py', '/etc/passwd', 'a\\b.py', 'a/\x00b.py'):
+            with self.subTest(directory=directory):
+                self.assertEqual(self.upload(directory=directory).status_code, 400)
+        self.assertEqual(self.problem.files.count(), 0)
+
+    def test_oversized_file_is_rejected(self):
+        self.assertEqual(self.upload(content='x' * (256 * 1024 + 1)).status_code, 400)
+        self.assertEqual(self.upload(content='x' * (256 * 1024)).status_code, 201)
+
+    def test_too_many_files_are_rejected(self):
+        for i in range(200):
+            ProblemFile.objects.create(problem=self.problem, directory=f'f{i}.py', content='x')
+
+        self.assertEqual(self.upload(directory='one_more.py').status_code, 400)
+
+    def test_total_size_is_capped(self):
+        for i in range(4):
+            ProblemFile.objects.create(problem=self.problem, directory=f'f{i}.py', content='x' * (256 * 1024))
+
+        self.assertEqual(self.upload().status_code, 400)
+
+    def test_oversized_update_is_rejected(self):
+        problem_file = ProblemFile.objects.create(problem=self.problem, directory='a.py', content='x')
+
+        response = self.client.post(
+            self.update_url(problem_file.id), {'new_content': 'x' * (256 * 1024 + 1)}, format='json'
         )
 
         self.assertEqual(response.status_code, 400)

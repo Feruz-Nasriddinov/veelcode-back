@@ -35,6 +35,15 @@ class ProblemFileUploadSerializer(ProblemFileSerializer):
     class Meta(ProblemFileSerializer.Meta):
         fields = ['id', 'directory', 'content', 'is_hidden']
 
+    def validate_directory(self, value):
+        path_error = validate_submission_path(value)
+        if path_error:
+            raise serializers.ValidationError(path_error)
+        return str(PurePosixPath(value))
+
+    def validate_content(self, value):
+        return validate_problem_content(value)
+
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
     comment_count = serializers.IntegerField(read_only = True)
@@ -53,6 +62,9 @@ class UpdateProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpdateProblem
         fields = ['id', 'new_content']
+
+    def validate_new_content(self, value):
+        return validate_problem_content(value)
 
 class SubmissionFilesSerializer(serializers.Serializer):
     def to_internal_value(self, data):
@@ -80,13 +92,21 @@ class SubmissionFilesSerializer(serializers.Serializer):
         for path, content in data.items():
             path_error = validate_submission_path(path)
             if path_error:
-                errors[str(path)] = [path_error]
+                errors[printable(path)] = [path_error]
                 continue
             if not isinstance(content, str):
-                errors[path] = ['File content must be a string.']
+                errors[printable(path)] = ['File content must be a string.']
                 continue
-            total_bytes += len(content.encode('utf-8'))
+            try:
+                total_bytes += len(content.encode('utf-8'))
+            except UnicodeEncodeError:
+                errors[printable(path)] = ['File content must be valid text.']
+                continue
             cleaned[str(PurePosixPath(path))] = content
+
+        for path in cleaned:
+            if any(str(parent) in cleaned for parent in PurePosixPath(path).parents):
+                errors[printable(path)] = ['A file and a folder cannot share the same path.']
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -101,6 +121,10 @@ class SubmissionFilesSerializer(serializers.Serializer):
         return cleaned
 
 
+def printable(path):
+    return str(path).encode('utf-8', 'replace').decode('utf-8')
+
+
 def validate_submission_path(path):
     if not isinstance(path, str) or not path.strip():
         return 'File path must be a non-empty string.'
@@ -112,9 +136,27 @@ def validate_submission_path(path):
         return 'Use "/" as the path separator.'
     if path.startswith('/'):
         return 'File path must be relative.'
+    try:
+        path.encode('utf-8')
+    except UnicodeEncodeError:
+        return 'File path must be valid text.'
     parts = PurePosixPath(path).parts
+    if not parts:
+        return 'File path must name a file.'
     if '..' in parts:
         return 'File path may not contain "..".'
     if any(':' in part for part in parts):
         return 'File path may not contain ":".'
     return None
+
+
+def validate_problem_content(value):
+    if len(value) > settings.PROBLEM_FILE_MAX_CHARS:
+        raise serializers.ValidationError(
+            f'File is longer than {settings.PROBLEM_FILE_MAX_CHARS} characters.'
+        )
+    try:
+        value.encode('utf-8')
+    except UnicodeEncodeError:
+        raise serializers.ValidationError('File content must be valid text.')
+    return value

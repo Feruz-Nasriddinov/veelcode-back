@@ -44,6 +44,28 @@ class SubmissionValidationTests(ProblemsTestCase):
     def test_overlong_path_is_rejected(self):
         self.assertRejected({'a' * 300: 'x = 1'})
 
+    def assertRawRejected(self, body):
+        with patch('problems.views.evaluate_tasks.apply_async') as delay:
+            response = self.client.post(
+                self.url(self.problem.id), body, content_type='application/json'
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Submission.objects.count(), 0)
+        delay.assert_not_called()
+
+    def test_lone_surrogate_content_is_rejected(self):
+        self.assertRawRejected('{"main.py": "\\ud800"}')
+
+    def test_lone_surrogate_path_is_rejected(self):
+        self.assertRawRejected('{"ma\\ud800in.py": "x = 1"}')
+
+    def test_a_file_and_a_folder_with_the_same_path_are_rejected(self):
+        self.assertRejected({'app': 'x = 1', 'app/views.py': 'x = 1'})
+
+    def test_a_path_naming_the_root_is_rejected(self):
+        self.assertRejected({'.': 'x = 1'})
+
     def test_empty_submission_is_rejected(self):
         self.assertRejected({})
 
@@ -78,3 +100,4 @@ class SubmissionValidationTests(ProblemsTestCase):
         submission_id, files = delay.call_args.kwargs['args']
         self.assertEqual(files, {'app/views.py': 'x = 1'})
         self.assertEqual(submission_id, Submission.objects.get().id)
+

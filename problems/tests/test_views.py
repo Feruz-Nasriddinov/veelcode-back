@@ -1,5 +1,8 @@
 import uuid
+from datetime import timedelta
 from unittest.mock import patch
+
+from django.utils import timezone
 
 from problems.models import ProblemFile
 from users.models import User, Submission
@@ -215,8 +218,8 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['score'], 55)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['score'], 55)
 
     def test_does_not_return_other_users_submissions(self):
         other = User.objects.create_user(
@@ -229,7 +232,18 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data['results'], [])
+
+    def test_is_paginated(self):
+        problem = self.make_problem()
+        for _ in range(21):
+            self.make_submission(problem=problem)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.data['count'], 21)
+        self.assertEqual(len(response.data['results']), 20)
+        self.assertIsNotNone(response.data['next'])
 
     def test_newest_submission_comes_first(self):
         self.make_submission(score=10)
@@ -237,15 +251,16 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
 
         response = self.client.get(self.url)
 
-        self.assertEqual([row['score'] for row in response.data], [20, 10])
+        self.assertEqual([row['score'] for row in response.data['results']], [20, 10])
 
     def test_every_submission_carries_its_problem(self):
         self.make_submission()
 
         response = self.client.get(self.url)
 
-        self.assertIn('problem', response.data[0])
-        self.assertIn('title', response.data[0]['problem'])
+        row = response.data['results'][0]
+        self.assertIn('problem', row)
+        self.assertIn('title', row['problem'])
 
 
 class SubmissionDetailViewTests(ProblemsTestCase):
@@ -314,3 +329,48 @@ class ThrottleScopeTests(ProblemsTestCase):
         from problems.views import SubmissionHistoryView
 
         self.assertIn(SubmissionHistoryView.throttle_scope, self.rates())
+
+
+class SubmitQueueLimitTests(ProblemsTestCase):
+    def submit(self, problem):
+        with patch('problems.views.evaluate_tasks.apply_async'):
+            return self.client.post(
+                f'/api/problems/{problem.id}/submit/', {'main.py': 'x = 1'}, format='json'
+            )
+
+    def test_a_user_cannot_have_more_than_two_pending_submissions(self):
+        problem = self.make_problem()
+        Submission.objects.create(user=self.user, problem=problem)
+        Submission.objects.create(user=self.user, problem=problem)
+
+        response = self.submit(problem)
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(Submission.objects.count(), 2)
+
+    def test_finished_submissions_do_not_count(self):
+        problem = self.make_problem()
+        Submission.objects.create(user=self.user, problem=problem, status='done')
+        Submission.objects.create(user=self.user, problem=problem, status='failed')
+
+        self.assertEqual(self.submit(problem).status_code, 202)
+
+    def test_old_pending_submissions_do_not_block_forever(self):
+        problem = self.make_problem()
+        for _ in range(2):
+            stuck = Submission.objects.create(user=self.user, problem=problem)
+            Submission.objects.filter(id=stuck.id).update(
+                created_at=timezone.now() - timedelta(hours=1)
+            )
+
+        self.assertEqual(self.submit(problem).status_code, 202)
+
+    def test_the_whole_platform_is_capped(self):
+        problem = self.make_problem()
+        for i in range(20):
+            other = User.objects.create_user(username=f'u{i}', email=f'u{i}@example.com', password=PASSWORD)
+            Submission.objects.create(user=other, problem=problem)
+
+        response = self.submit(problem)
+
+        self.assertEqual(response.status_code, 429)

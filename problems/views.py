@@ -1,4 +1,8 @@
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from django.db.models import Prefetch, F, Count
 from kombu.exceptions import OperationalError
 from rest_framework import status
@@ -72,6 +76,19 @@ class SubmitView(APIView):
 
         serializer = SubmissionFilesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        recent_pending = Submission.objects.filter(
+            status='pending',
+            created_at__gte=timezone.now() - timedelta(seconds=settings.SUBMISSION_PENDING_WINDOW_SECONDS),
+        )
+        if (
+            recent_pending.filter(user=request.user).count() >= settings.SUBMISSION_MAX_PENDING_PER_USER
+            or recent_pending.count() >= settings.SUBMISSION_MAX_PENDING_GLOBAL
+        ):
+            return Response(
+                {'message': 'Too many submissions are being evaluated, try again shortly'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
         submission = Submission.objects.create(
             problem = problem,

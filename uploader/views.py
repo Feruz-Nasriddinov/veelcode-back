@@ -1,3 +1,6 @@
+from django.conf import settings
+from django.db.models import Count, Sum
+from django.db.models.functions import Length
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -32,6 +35,18 @@ class UploadProblemDetailView(APIView):
         
         serializer = ProblemFileUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        usage = problem.files.aggregate(count=Count('id'), chars=Sum(Length('content')))
+        if usage['count'] >= settings.PROBLEM_MAX_FILES:
+            return Response(
+                {'message': f'A problem can have at most {settings.PROBLEM_MAX_FILES} files'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if (usage['chars'] or 0) + len(serializer.validated_data['content']) > settings.PROBLEM_MAX_TOTAL_CHARS:
+            return Response(
+                {'message': f'A problem can hold at most {settings.PROBLEM_MAX_TOTAL_CHARS} characters of files'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer.save(problem=problem)
 
