@@ -1,10 +1,13 @@
 import re
+import time
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from users.models import SocialAccount, UserLocation
 
@@ -49,7 +52,11 @@ def rotate_refresh_token(raw_refresh):
     if not raw_refresh:
         raise TokenError('No refresh token provided.')
 
-    refresh = RefreshToken(raw_refresh)
+    try:
+        refresh = RefreshToken(raw_refresh)
+    except TokenError:
+        _revoke_family_if_reused(raw_refresh)
+        raise
 
     user_id = refresh.payload.get(api_settings.USER_ID_CLAIM)
     user = User.objects.filter(**{api_settings.USER_ID_FIELD: user_id}).first()
@@ -57,7 +64,10 @@ def rotate_refresh_token(raw_refresh):
         raise TokenError('No active account found for the given token.')
 
     if api_settings.BLACKLIST_AFTER_ROTATION:
-        refresh.blacklist()
+        _, newly_blacklisted = refresh.blacklist()
+        if not newly_blacklisted:
+            revoke_all_refresh_tokens(user)
+            raise TokenError('Token is blacklisted')
 
     refresh.set_jti()
     refresh.set_exp()
@@ -65,6 +75,24 @@ def rotate_refresh_token(raw_refresh):
     refresh.outstand()
 
     return refresh.access_token, refresh, user
+
+
+def revoke_all_refresh_tokens(user):
+    for outstanding in OutstandingToken.objects.filter(user=user):
+        BlacklistedToken.objects.get_or_create(token=outstanding)
+
+
+def _revoke_family_if_reused(raw_refresh):
+    try:
+        token = RefreshToken(raw_refresh, verify=False)
+        jti = token.payload[api_settings.JTI_CLAIM]
+        token.verify_token_type()
+        token.check_exp()
+    except (TokenError, KeyError):
+        return
+    outstanding = OutstandingToken.objects.filter(jti=jti).select_related('user').first()
+    if outstanding and outstanding.user and BlacklistedToken.objects.filter(token=outstanding).exists():
+        revoke_all_refresh_tokens(outstanding.user)
 
 
 def blacklist_refresh_token(raw_refresh):
@@ -77,8 +105,28 @@ def blacklist_refresh_token(raw_refresh):
     return True
 
 
+def _revoked_key(jti):
+    return f'revoked-access:{jti}'
+
+
+def revoke_access_token(raw_access):
+    if not raw_access:
+        return
+    try:
+        token = AccessToken(raw_access)
+    except TokenError:
+        return
+    ttl = int(token['exp'] - time.time())
+    if ttl > 0:
+        cache.set(_revoked_key(token[api_settings.JTI_CLAIM]), 1, ttl)
+
+
+def is_access_token_revoked(validated_token):
+    return cache.get(_revoked_key(validated_token[api_settings.JTI_CLAIM])) is not None
+
+
 def unique_username(seed):
-    base = re.sub(r'[^\w.+-]', '', (seed or '').strip())[:140] or 'user'
+    base = re.sub(r'[^\w.+-]', '', (seed or '').strip(), flags=re.ASCII)[:140] or 'user'
     username = base
     suffix = 1
     while User.objects.filter(username__iexact=username).exists():
@@ -100,6 +148,8 @@ def link_social_account(*, provider, provider_user_id, email, username_seed):
 
     email = User.objects.normalize_email(email.strip())
     user = User.objects.filter(email__iexact=email).first()
+    if user is not None and user.has_usable_password():
+        raise OAuthError('An account with this email already exists. Log in with your password.')
     if user is None:
         user = User.objects.create_user(
             username=unique_username(username_seed),

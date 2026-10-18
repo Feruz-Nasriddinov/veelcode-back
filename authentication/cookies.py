@@ -30,6 +30,23 @@ def set_refresh_cookie(response, token):
     )
 
 
+def set_oauth_state_cookie(response, state):
+    response.set_cookie(
+        settings.OAUTH_STATE_COOKIE_NAME,
+        state,
+        max_age=settings.OAUTH_STATE_MAX_AGE,
+        **_base_kwargs(settings.AUTH_REFRESH_COOKIE_PATH),
+    )
+    return response
+
+
+def clear_oauth_state_cookie(response):
+    response.set_cookie(
+        settings.OAUTH_STATE_COOKIE_NAME, '', max_age=0, **_base_kwargs(settings.AUTH_REFRESH_COOKIE_PATH)
+    )
+    return response
+
+
 def set_auth_cookies(response, access_token, refresh_token):
     set_access_cookie(response, access_token)
     set_refresh_cookie(response, refresh_token)

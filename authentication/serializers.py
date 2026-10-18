@@ -28,15 +28,10 @@ class SignupSerializer(serializers.Serializer):
             raise serializers.ValidationError('Username may not contain "@".')
         for validator in User._meta.get_field('username').validators:
             validator(value)
-        if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError('A user with that username already exists.')
         return value
 
     def validate_email(self, value):
-        value = User.objects.normalize_email(value.strip())
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError('A user with that email already exists.')
-        return value
+        return User.objects.normalize_email(value.strip())
 
     def validate_timezone(self, value):
         try:
@@ -65,3 +60,4 @@ class LoginSerializer(serializers.Serializer):
 
 class OAuthCodeSerializer(serializers.Serializer):
     code = serializers.CharField(trim_whitespace=True)
+    state = serializers.CharField(trim_whitespace=True)

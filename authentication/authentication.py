@@ -2,6 +2,9 @@ from django.conf import settings
 from django.middleware.csrf import CsrfViewMiddleware
 from rest_framework import exceptions
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken
+
+from . import services
 
 CSRF_EXEMPT_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS', 'TRACE'})
 
@@ -32,6 +35,8 @@ class CookieJWTAuthentication(JWTAuthentication):
             return None
 
         validated_token = self.get_validated_token(raw_token)
+        if services.is_access_token_revoked(validated_token):
+            raise InvalidToken('Token has been revoked.')
         user = self.get_user(validated_token)
 
         self.enforce_csrf(request)

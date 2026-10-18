@@ -10,6 +10,7 @@ from .base import (
     ACCESS_COOKIE,
     GITHUB_URL,
     GOOGLE_URL,
+    OAUTH_STATE_URL,
     REFRESH_COOKIE,
     VALID_PASSWORD,
     AuthTestCase,
@@ -140,24 +141,27 @@ class GoogleLoginSuccessTests(SocialLoginTestCase):
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(SocialAccount.objects.count(), 1)
 
-    def test_links_to_an_existing_account_with_the_same_email(self):
-        user = self.create_user(username='ryota', email='ryota@example.com')
+    def test_refuses_to_link_to_an_existing_password_account(self):
+        self.create_user(username='ryota', email='ryota@example.com')
         self.mock_provider(self.google_routes())
 
         response = self.social_login(GOOGLE_URL)
 
-        self.assertEqual(response.data['id'], user.id)
-        self.assertEqual(User.objects.count(), 1)
-        self.assertTrue(user.social_accounts.filter(provider='google').exists())
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(SocialAccount.objects.count(), 0)
+        self.assertIsNone(self.cookie(response, ACCESS_COOKIE))
 
-    def test_password_login_still_works_after_linking(self):
-        self.create_user(username='ryota', email='ryota@example.com')
+    def test_links_to_an_existing_social_only_account_with_the_same_email(self):
         self.mock_provider(self.google_routes())
-        self.social_login(GOOGLE_URL)
+        first = self.social_login(GOOGLE_URL)
+        self.mock_provider(self.github_routes(**{GITHUB_EMAILS_URL: [
+            {'email': 'ryota@example.com', 'primary': True, 'verified': True},
+        ]}))
 
-        response = self.login(identifier='ryota', password=VALID_PASSWORD)
+        response = self.social_login(GITHUB_URL)
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['id'], first.data['id'])
+        self.assertEqual(User.objects.count(), 1)
 
     def test_no_token_in_response_body(self):
         self.mock_provider(self.google_routes())
@@ -240,7 +244,7 @@ class GoogleLoginFailureTests(SocialLoginTestCase):
         self.assertEqual(response.data['detail'], 'This login provider is not configured.')
 
     def test_inactive_user_is_rejected(self):
-        user = self.create_user(username='ryota', email='ryota@example.com')
+        user = User.objects.create_user(username='ryota', email='ryota@example.com', password=None)
         user.is_active = False
         user.save(update_fields=['is_active'])
         self.mock_provider(self.google_routes())
@@ -337,3 +341,51 @@ class GithubLoginTests(SocialLoginTestCase):
         response = self.social_login(GITHUB_URL)
 
         self.assertEqual(response.data['username'], 'user')
+
+
+@override_settings(**OAUTH_SETTINGS)
+class OAuthStateTests(SocialLoginTestCase):
+    def test_state_endpoint_sets_a_matching_cookie(self):
+        response = self.client.get(OAUTH_STATE_URL)
+
+        self.assertEqual(response.status_code, 200)
+        morsel = self.assertCookieSet(response, 'oauth_state')
+        self.assertEqual(morsel.value, response.data['state'])
+        self.assertTrue(morsel['httponly'])
+
+    def test_login_without_a_state_is_rejected(self):
+        self.mock_provider(self.google_routes())
+        self.client.get(OAUTH_STATE_URL)
+
+        response = self.client.post(GOOGLE_URL, {'code': 'auth-code'}, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_login_with_a_wrong_state_is_rejected(self):
+        self.mock_provider(self.google_routes())
+        self.client.get(OAUTH_STATE_URL)
+
+        response = self.social_login(GOOGLE_URL, state='attacker-state')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_login_without_the_state_cookie_is_rejected(self):
+        self.mock_provider(self.google_routes())
+        state = self.client.get(OAUTH_STATE_URL).data['state']
+        self.client.cookies.pop('oauth_state')
+
+        response = self.social_login(GOOGLE_URL, state=state)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(User.objects.count(), 0)
+
+    def test_the_state_is_single_use(self):
+        self.mock_provider(self.google_routes())
+        state = self.client.get(OAUTH_STATE_URL).data['state']
+        self.client.post(GOOGLE_URL, {'code': 'auth-code', 'state': state}, format='json')
+
+        response = self.client.post(GOOGLE_URL, {'code': 'auth-code', 'state': state}, format='json')
+
+        self.assertEqual(response.status_code, 400)

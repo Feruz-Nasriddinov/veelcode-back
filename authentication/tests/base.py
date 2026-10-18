@@ -16,6 +16,7 @@ ME_URL = '/api/auth/me/'
 CSRF_URL = '/api/auth/csrf/'
 GOOGLE_URL = '/api/auth/google/'
 GITHUB_URL = '/api/auth/github/'
+OAUTH_STATE_URL = '/api/auth/oauth-state/'
 
 VALID_PASSWORD = 'Sup3rSecret!pass'
 
@@ -49,8 +50,10 @@ class AuthTestCase(TestCase):
             LOGIN_URL, {'identifier': identifier, 'password': password}, format='json'
         )
 
-    def social_login(self, url=GOOGLE_URL, code='auth-code'):
-        return self.client.post(url, {'code': code}, format='json')
+    def social_login(self, url=GOOGLE_URL, code='auth-code', state=None):
+        if state is None:
+            state = self.client.get(OAUTH_STATE_URL).data['state']
+        return self.client.post(url, {'code': code, 'state': state}, format='json')
 
     def cookie(self, response, name):
         return response.cookies.get(name)

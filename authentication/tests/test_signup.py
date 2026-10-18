@@ -158,7 +158,7 @@ class SignupUniquenessTests(AuthTestCase):
         response = self.signup(email='RYOTA@Example.COM')
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn('email', response.data)
+        self.assertIn('detail', response.data)
         self.assertEqual(User.objects.count(), 1)
 
     def test_duplicate_username_different_casing(self):
@@ -167,7 +167,7 @@ class SignupUniquenessTests(AuthTestCase):
         response = self.signup(username='RyOtA')
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn('username', response.data)
+        self.assertIn('detail', response.data)
         self.assertEqual(User.objects.count(), 1)
 
     def test_database_rejects_case_insensitive_duplicates(self):
@@ -184,3 +184,19 @@ class SignupUniquenessTests(AuthTestCase):
             User.objects.create_user(
                 username='other', email='RYOTA@EXAMPLE.COM', password=VALID_PASSWORD
             )
+
+
+class SignupUsernameCharsetTests(AuthTestCase):
+    def test_lookalike_unicode_username_is_rejected(self):
+        response = self.signup(username='r\u0443ota')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('username', response.data)
+
+    def test_taken_username_and_email_give_the_same_message(self):
+        self.create_user(username='ryota', email='ryota@example.com')
+
+        by_email = self.signup(username='fresh', email='ryota@example.com')
+        by_username = self.signup(username='ryota', email='fresh@example.com')
+
+        self.assertEqual(by_email.data, by_username.data)

@@ -1,3 +1,6 @@
+import hmac
+import secrets
+
 from django.conf import settings
 from django.db import IntegrityError
 from django.utils.decorators import method_decorator
@@ -12,7 +15,12 @@ from rest_framework_simplejwt.exceptions import TokenError
 
 from . import services
 from .authentication import enforce_csrf
-from .cookies import clear_auth_cookies, set_auth_cookies
+from .cookies import (
+    clear_auth_cookies,
+    clear_oauth_state_cookie,
+    set_auth_cookies,
+    set_oauth_state_cookie,
+)
 from .oauth import OAuthError
 from .serializers import (
     LoginSerializer,
@@ -50,7 +58,7 @@ class SignupView(PublicAPIView):
                 timezone=data['timezone'],
             )
         except IntegrityError:
-            raise ValidationError({'detail': 'That username or email is already taken.'})
+            raise ValidationError({'detail': 'That username or email is unavailable.'})
 
         access, refresh = services.issue_tokens(user)
         response = Response(PublicUserSerializer(user).data, status=status.HTTP_201_CREATED)
@@ -90,19 +98,37 @@ class SocialLoginView(PublicAPIView):
         serializer = OAuthCodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        expected_state = request.COOKIES.get(settings.OAUTH_STATE_COOKIE_NAME, '')
+        if not expected_state or not hmac.compare_digest(
+            expected_state.encode(), serializer.validated_data['state'].encode()
+        ):
+            return clear_oauth_state_cookie(
+                Response({'detail': 'Invalid login state.'}, status=status.HTTP_400_BAD_REQUEST)
+            )
+
         try:
             user = services.authenticate_social_user(
                 provider=self.provider,
                 code=serializer.validated_data['code'],
             )
         except OAuthError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return clear_oauth_state_cookie(
+                Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            )
         except IntegrityError:
             raise ValidationError({'detail': 'That username or email is already taken.'})
 
         access, refresh = services.issue_tokens(user)
         response = Response(PublicUserSerializer(user).data, status=status.HTTP_200_OK)
-        return set_auth_cookies(response, access, refresh)
+        return clear_oauth_state_cookie(set_auth_cookies(response, access, refresh))
+
+
+class OAuthStateView(PublicAPIView):
+    throttle_scope = 'auth-state'
+
+    def get(self, request):
+        state = secrets.token_urlsafe(32)
+        return set_oauth_state_cookie(Response({'state': state}), state)
 
 
 class RefreshView(PublicAPIView):
@@ -126,6 +152,7 @@ class RefreshView(PublicAPIView):
 class LogoutView(PublicAPIView):
     def post(self, request):
         services.blacklist_refresh_token(request.COOKIES.get(settings.AUTH_REFRESH_COOKIE_NAME))
+        services.revoke_access_token(request.COOKIES.get(settings.AUTH_ACCESS_COOKIE_NAME))
         response = Response(status=status.HTTP_204_NO_CONTENT)
         return clear_auth_cookies(response)
 

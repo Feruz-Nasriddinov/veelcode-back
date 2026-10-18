@@ -2,6 +2,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urlsplit
 import os
+import sys
 from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 import dj_database_url
@@ -22,6 +23,7 @@ def env_list(name):
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 DEBUG = env_bool('DEBUG', False)
+TESTING = 'test' in sys.argv
 
 SECRET_KEY = os.getenv('SECRET_KEY') or ("django-test-secret-key" if DEBUG else '')
 if not SECRET_KEY:
@@ -50,6 +52,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'config.middleware.RequestSizeLimitMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -159,12 +162,32 @@ MAILERS = {
 SUBMISSION_MAX_FILES = 200
 SUBMISSION_MAX_PATH_LENGTH = 255
 SUBMISSION_MAX_TOTAL_BYTES = 1024 * 1024
+SUBMISSION_MAX_PENDING_PER_USER = 2
+SUBMISSION_MAX_PENDING_GLOBAL = 20
+SUBMISSION_PENDING_WINDOW_SECONDS = 600
+
+PROBLEM_MAX_FILES = 200
+PROBLEM_FILE_MAX_CHARS = 256 * 1024
+PROBLEM_MAX_TOTAL_CHARS = 1024 * 1024
+
+REQUEST_MAX_BYTES = 8 * 1024 * 1024
+
+EVALUATOR_WORKSPACE_SIZE = '128m'
+EVALUATOR_TMP_SIZE = '64m'
+EVALUATOR_FALLBACK_UID = 65534
 
 
 # Celery
 # https://docs.celeryq.dev/en/stable/django/first-steps-with-django.html
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+REDIS_URL = os.getenv('REDIS_URL') or ('redis://localhost:6379/0' if DEBUG or TESTING else '')
+if not REDIS_URL:
+    raise ImproperlyConfigured('REDIS_URL must be set when DEBUG is False.')
+
+if TESTING:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+else:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}}
 
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL)
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND') or None
@@ -180,10 +203,15 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'problems.tasks.cleanup_evaluator_leftovers',
         'schedule': 300,
     },
+    'flush-expired-tokens': {
+        'task': 'authentication.tasks.flush_expired_tokens',
+        'schedule': 86400,
+    },
 }
 
 
 REST_FRAMEWORK = {
+    'NUM_PROXIES': int(os.getenv('NUM_PROXIES', '1')),
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'authentication.authentication.CookieJWTAuthentication',
     ],
@@ -213,9 +241,20 @@ REST_FRAMEWORK = {
         'profile': '20/min',
         'activity-track': '20/min',
         'update-problem': '10/min',
+        'auth-state': '20/min',
     },
 }
 
+
+SPECTACULAR_SETTINGS = {
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.IsAdminUser'],
+}
+
+ADMIN_URL_PATH = os.getenv('ADMIN_URL_PATH', 'admin/').strip('/') + '/'
+ADMIN_LOGIN_MAX_ATTEMPTS_PER_MINUTE = 5
+
+OAUTH_STATE_COOKIE_NAME = 'oauth_state'
+OAUTH_STATE_MAX_AGE = 600
 
 AUTH_USER_MODEL = 'users.User'
 
