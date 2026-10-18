@@ -5,13 +5,13 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import get_object_or_404
 
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .models import Submission, UserLocation
 from .serializers import ProfileSerializer
+from problems.paginators import HistoryPagination
 
 def get_user_tz(user):
 
@@ -32,9 +32,17 @@ class ProfileView(APIView):
 
         submissions = Submission.objects.filter(user = request.user).select_related('problem', 'user')
 
-        serializer = ProfileSerializer(submissions, many=True)
+        paginator = HistoryPagination()
 
-        return Response(serializer.data)
+        page = paginator.paginate_queryset(
+            submissions,
+            request,
+            view=self
+        )
+
+        data = ProfileSerializer(page, many=True).data
+
+        return paginator.get_paginated_response(data)
     
 MIN_YEAR = 2026
 

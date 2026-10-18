@@ -6,7 +6,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
-from rest_framework.pagination import PageNumberPagination
 
 from .models import Problem, ProblemFile, Comment, Like
 from .serializers import (
@@ -18,16 +17,9 @@ from .serializers import (
 )
 from .services.comments import comments_for_viewer
 from .tasks import evaluate_tasks
+from .paginators import CommentPagination, ProblemPagination, HistoryPagination
 from users.models import Submission
 from users.serializers import SubmissionSerializer
-
-class ProblemPagination(PageNumberPagination):
-    max_page_size = 100
-    page_size = 20
-
-class CommentPagination(PageNumberPagination):
-    max_page_size = 100
-    page_size = 20
 
 class ProblemListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -123,9 +115,18 @@ class SubmissionHistoryView(APIView):
 
         submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
 
-        data = SubmissionSerializer(submissions, many=True).data
+        paginator = HistoryPagination()
 
-        return Response(data)
+        page = paginator.paginate_queryset(
+            submissions,
+            request,
+            view=self,
+
+        )
+
+        data = SubmissionSerializer(page, many=True).data
+
+        return paginator.get_paginated_response(data)
 
 class CommentView(APIView):
     permission_classes = [IsAuthenticated]
