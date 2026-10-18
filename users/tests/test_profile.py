@@ -22,7 +22,7 @@ class ProfileViewTests(UsersTestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data, [{
+        self.assertEqual(response.data['results'], [{
             'id': str(submission.id),
             'username': 'ryota',
             'language': 'python',
@@ -36,13 +36,13 @@ class ProfileViewTests(UsersTestCase):
 
         response = self.client.get(self.url)
 
-        self.assertEqual(response.data, [])
+        self.assertEqual(response.data['results'], [])
 
     def test_query_count_does_not_grow_with_submissions(self):
         for _ in range(5):
             self.make_submission()
 
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             self.client.get(self.url)
 
 
