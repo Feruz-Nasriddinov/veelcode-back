@@ -39,8 +39,12 @@ class UploadProblemDetailViewTests(UploaderTestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(self.problem.files.count(), 1)
-        self.assertEqual(self.problem.files.get().directory, 'app/views.py')
-        self.assertFalse(self.problem.files.get().is_hidden)
+        problem_file = self.problem.files.get()
+        self.assertEqual(problem_file.directory, 'app/views.py')
+        self.assertFalse(problem_file.is_hidden)
+        self.assertEqual(response.data, {
+            'id': str(problem_file.id), 'directory': 'app/views.py', 'content': 'x = 1', 'is_hidden': False,
+        })
 
     def test_adds_a_hidden_test_file(self):
         response = self.client.post(

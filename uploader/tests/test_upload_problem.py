@@ -23,20 +23,20 @@ class UploadProblemViewTests(UploaderTestCase):
         self.assertEqual(problem.title, 'Fix the cache')
         self.assertEqual(problem.source, 'https://github.com/acme/cache-service')
 
-    def test_missing_source_is_rejected(self):
+    def test_source_is_optional(self):
         payload = self.payload()
         del payload['source']
 
         response = self.client.post(UPLOAD_URL, payload, format='json')
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('source', response.data)
-        self.assertEqual(Problem.objects.count(), 0)
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(Problem.objects.get().source)
 
-    def test_response_does_not_leak_the_problem_id(self):
+    def test_response_returns_the_created_problem(self):
         response = self.client.post(UPLOAD_URL, self.payload(), format='json')
 
-        self.assertEqual(response.data, {'message': 'Uploaded Problem will be checked'})
+        problem = Problem.objects.get()
+        self.assertEqual(response.data, {'id': str(problem.id), **self.payload()})
 
     def test_missing_fields_are_rejected(self):
         response = self.client.post(UPLOAD_URL, {'title': 'Only a title'}, format='json')

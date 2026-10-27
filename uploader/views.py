@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 
-from problems.models import Problem, ProblemFile, UpdateProblem
+from problems.models import Problem, ProblemFile
 from problems.serializers import ProblemSerializer, ProblemFileUploadSerializer, UpdateProblemSerializer
 
 class UploadProblemView(APIView):
@@ -20,7 +20,7 @@ class UploadProblemView(APIView):
 
         serializer.save(status='pending', created_by = request.user)
 
-        return Response({'message': 'Uploaded Problem will be checked'}, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class UploadProblemDetailView(APIView):
     permission_classes = [IsAuthenticated]
@@ -50,7 +50,7 @@ class UploadProblemDetailView(APIView):
 
         serializer.save(problem=problem)
 
-        return Response(status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class UpdateUploadedProblemView(APIView):
     permission_classes = [IsAuthenticated]
