@@ -96,10 +96,12 @@ Submission limits (`config/settings.py`): at most 200 files, paths up to 255 cha
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/uploader/problem/` | Create a problem (`title`, `description`, `difficulty`, `field`, `language`, `framework`, `source`). It starts as `pending`. |
-| `POST` | `/api/uploader/problem/<problem_id>/content/` | Add a file (`directory`, `content`, `is_hidden`) to your own pending problem. |
-| `POST` | `/api/uploader/problem/<problem_file_id>/content/update/` | Propose new content for a file in your problem. Saved as an `UpdateProblem` record; the file itself isn't changed. |
+| `POST` | `/api/uploader/problem/<problem_id>/content/` | Add files to your own pending problem in one request: `{"<path>": {"content": "...", "is_hidden": false}}`. All or nothing. Returns `[{id, directory, is_hidden}]`. |
+| `POST` | `/api/uploader/content/<problem_file_id>/update/` | Propose new content for a file in your problem. Saved as an `UpdateProblem` record; the file itself isn't changed. |
 
-`source` is required and says where the codebase came from: either the URL of the public GitHub repo it was taken from, or, if the repo is private, a short description of that repo.
+`source` is optional and says where the codebase came from: either the URL of the public GitHub repo it was taken from, or, if the repo is private, a short description of that repo.
+
+A path can be stored once per problem, and a file can't share its path with a folder (`a.py` and `a.py/b.py`). Uploading a path that's already stored is rejected; change it through the update endpoint.
 
 Problems are accepted or rejected by changing `status` in the Django admin (`/admin/`). Set `time_required` there too: the upload API doesn't accept it and the default is `0`.
 
@@ -257,7 +259,8 @@ Defined in `config/settings.py` under `REST_FRAMEWORK.DEFAULT_THROTTLE_RATES`, a
 | `like` / `unlike` | 40/min | Likes |
 | `profile` | 20/min | Profile |
 | `activity-track` | 20/min | Activity |
-| `upload-problem` | 3/min | Creating problems, adding files |
+| `upload-problem` | 3/min | Creating problems |
+| `upload-files` | 10/min | Adding files to a problem |
 | `update-problem` | 10/min | Proposing file updates |
 | `auth-signup` | 10/hour | Signup |
 | `auth-login` | 10/min | Login |
