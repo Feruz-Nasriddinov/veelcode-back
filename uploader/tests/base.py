@@ -1,5 +1,5 @@
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from rest_framework.test import APIClient
 
 from users.models import User
@@ -9,7 +9,6 @@ PASSWORD = 'Sup3rSecret!pass'
 UPLOAD_URL = '/api/uploader/problem/'
 
 
-@override_settings(ROOT_URLCONF='uploader.tests.urls')
 class UploaderTestCase(TestCase):
     client_class = APIClient
 

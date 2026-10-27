@@ -3,7 +3,7 @@ import uuid
 
 from django.test import TestCase
 
-from uploader.views import UpdateUploadedProblemView
+from uploader.views import UpdateUploadedProblemView, UploadProblemDetailView, UploadProblemView
 
 
 class UploaderRoutingTests(TestCase):
@@ -38,10 +38,26 @@ class UploaderRoutingTests(TestCase):
             'problem_file_id must accept a UUID ProblemFile id',
         )
 
+    def test_update_endpoint_does_not_sit_under_problem(self):
+        from django.urls import resolve
+
+        match = resolve(f'/api/uploader/content/{uuid.uuid4()}/update/')
+
+        self.assertIs(match.func.view_class, UpdateUploadedProblemView)
+
     def test_update_problem_throttle_scope_has_a_rate(self):
         from django.conf import settings
 
         self.assertIn(
             UpdateUploadedProblemView.throttle_scope,
+            settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'],
+        )
+
+    def test_upload_files_has_its_own_throttle_scope_with_a_rate(self):
+        from django.conf import settings
+
+        self.assertNotEqual(UploadProblemDetailView.throttle_scope, UploadProblemView.throttle_scope)
+        self.assertIn(
+            UploadProblemDetailView.throttle_scope,
             settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'],
         )

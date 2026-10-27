@@ -1,6 +1,3 @@
-from django.conf import settings
-from django.db.models import Count, Sum
-from django.db.models.functions import Length
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -8,7 +5,12 @@ from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 
 from problems.models import Problem, ProblemFile, UpdateProblem
-from problems.serializers import ProblemSerializer, ProblemFileUploadSerializer, UpdateProblemSerializer, UpdateProblemReadSerializer
+from problems.serializers import (
+    ProblemSerializer, ProblemFileUploadSerializer, ProblemFilesUploadSerializer,
+    UpdateProblemSerializer, UpdateProblemReadSerializer,
+)
+
+from .services import add_problem_files
 
 class UploadProblemView(APIView):
     permission_classes = [IsAuthenticated]
@@ -24,7 +26,7 @@ class UploadProblemView(APIView):
 
 class UploadProblemDetailView(APIView):
     permission_classes = [IsAuthenticated]
-    throttle_scope = 'upload-problem'
+    throttle_scope = 'upload-files'
 
     def post(self, request, problem_id):
 
@@ -33,24 +35,12 @@ class UploadProblemDetailView(APIView):
         if problem.status == 'accepted' or problem.status == 'rejected':
             return Response({"message": 'Cannot make changes to the accepted/rejected problems'}, status=status.HTTP_400_BAD_REQUEST)
         
-        serializer = ProblemFileUploadSerializer(data=request.data)
+        serializer = ProblemFilesUploadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        usage = problem.files.aggregate(count=Count('id'), chars=Sum(Length('content')))
-        if usage['count'] >= settings.PROBLEM_MAX_FILES:
-            return Response(
-                {'message': f'A problem can have at most {settings.PROBLEM_MAX_FILES} files'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if (usage['chars'] or 0) + len(serializer.validated_data['content']) > settings.PROBLEM_MAX_TOTAL_CHARS:
-            return Response(
-                {'message': f'A problem can hold at most {settings.PROBLEM_MAX_TOTAL_CHARS} characters of files'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        files = add_problem_files(problem, serializer.validated_data)
 
-        serializer.save(problem=problem)
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(ProblemFileUploadSerializer(files, many=True).data, status=status.HTTP_201_CREATED)
 
 class UpdateUploadedProblemView(APIView):
     permission_classes = [IsAuthenticated]
