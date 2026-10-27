@@ -61,7 +61,7 @@ class UpdatesHistoryView(APIView):
     throttle_scope = 'updates-history'
 
     def get(self, request):
-        updates = UpdateProblem.objects.filter(user = request.user).select_related('problem', 'problem_file')
+        updates = UpdateProblem.objects.filter(problem__created_by = request.user).select_related('problem', 'problem_file')
 
         serializer = UpdateProblemReadSerializer(updates, many = True)
 
