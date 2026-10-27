@@ -229,6 +229,7 @@ REST_FRAMEWORK = {
         'submit': '10/min',
         'submit-details': '40/min',
         'upload-problem': '3/min',
+        'upload-files': '10/min',
         'auth-signup': '10/hour',
         'auth-login': '10/min',
         'auth-refresh': '20/min',
