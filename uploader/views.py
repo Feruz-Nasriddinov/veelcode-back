@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
 
-from problems.models import Problem, ProblemFile
-from problems.serializers import ProblemSerializer, ProblemFileUploadSerializer, UpdateProblemSerializer
+from problems.models import Problem, ProblemFile, UpdateProblem
+from problems.serializers import ProblemSerializer, ProblemFileUploadSerializer, UpdateProblemSerializer, UpdateProblemReadSerializer
 
 class UploadProblemView(APIView):
     permission_classes = [IsAuthenticated]
@@ -65,3 +65,14 @@ class UpdateUploadedProblemView(APIView):
         serializer.save(problem = problem_file.problem, problem_file = problem_file)
 
         return Response({'message': 'Updates saved'}, status=status.HTTP_201_CREATED)
+
+class UpdatesHistoryView(APIView):
+    permission_classes = [IsAuthenticated]
+    throttle_scope = 'updates-history'
+
+    def get(self, request):
+        updates = UpdateProblem.objects.filter(user = request.user).select_related('problem', 'problem_file')
+
+        serializer = UpdateProblemReadSerializer(updates, many = True)
+
+        return Response(serializer.data)

@@ -78,9 +78,17 @@ class ProblemFile(models.Model):
         return f'{self.problem.title}-{self.directory}'
 
 class UpdateProblem(models.Model):
+    STATUS_CHOICES = [
+            ('pending', 'pending'),
+            ('accepted', 'accepted'),
+            ('rejected', 'rejected')
+        ]
+
+    title = models.CharField(max_length=255)
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE)
     problem_file = models.ForeignKey(ProblemFile, on_delete=models.CASCADE)
     new_content = models.TextField()
+    status = models.CharField(choices=STATUS_CHOICES, max_length=8, default='pending')
 
     def __str__(self):
         return f'{self.problem.id}-{self.problem_file.directory}'

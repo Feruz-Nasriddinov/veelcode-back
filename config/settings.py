@@ -242,6 +242,7 @@ REST_FRAMEWORK = {
         'activity-track': '20/min',
         'update-problem': '10/min',
         'auth-state': '20/min',
+        'updates-history': '20/min',
     },
 }
 

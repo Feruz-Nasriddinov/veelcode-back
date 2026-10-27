@@ -66,6 +66,14 @@ class UpdateProblemSerializer(serializers.ModelSerializer):
     def validate_new_content(self, value):
         return validate_problem_content(value)
 
+class UpdateProblemReadSerializer(serializers.ModelSerializer):
+    problem = ProblemSerializer(read_only = True)
+    problem_file = ProblemFileSerializer(read_only = True)
+
+    class Meta:
+        model = UpdateProblem
+        fields = ['id', 'title', 'problem', 'problem_file', 'status']
+
 class SubmissionFilesSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         if not isinstance(data, dict):
