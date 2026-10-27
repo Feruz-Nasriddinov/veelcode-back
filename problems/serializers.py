@@ -101,7 +101,7 @@ class ProblemSerializer(serializers.ModelSerializer):
 class UpdateProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpdateProblem
-        fields = ['id', 'new_content']
+        fields = ['id', 'title', 'new_content']
 
     def validate_new_content(self, value):
         return validate_problem_content(value)
