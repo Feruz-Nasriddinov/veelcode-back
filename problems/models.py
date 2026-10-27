@@ -74,6 +74,14 @@ class ProblemFile(models.Model):
     content = models.TextField()
     is_hidden = models.BooleanField(default=False)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields = ['problem', 'directory'],
+                name = 'unique_problem_file_path'
+            )
+        ]
+
     def __str__(self):
         return f'{self.problem.title}-{self.directory}'
 

@@ -33,16 +33,56 @@ class ProblemFileSerializer(serializers.ModelSerializer):
 
 class ProblemFileUploadSerializer(ProblemFileSerializer):
     class Meta(ProblemFileSerializer.Meta):
-        fields = ['id', 'directory', 'content', 'is_hidden']
+        fields = ['id', 'directory', 'is_hidden']
 
-    def validate_directory(self, value):
-        path_error = validate_submission_path(value)
-        if path_error:
-            raise serializers.ValidationError(path_error)
-        return str(PurePosixPath(value))
+class ProblemFileEntrySerializer(serializers.Serializer):
+    content = serializers.CharField(trim_whitespace=False, allow_blank=True)
+    is_hidden = serializers.BooleanField(default=False)
 
     def validate_content(self, value):
         return validate_problem_content(value)
+
+class ProblemFilesUploadSerializer(serializers.Serializer):
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: [
+                    'Expected an object mapping file paths to files.'
+                ]}
+            )
+        if not data:
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: ['At least one file is required.']}
+            )
+        if len(data) > settings.PROBLEM_MAX_FILES:
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: [
+                    f'A problem can have at most {settings.PROBLEM_MAX_FILES} files.'
+                ]}
+            )
+
+        errors = {}
+        cleaned = {}
+
+        for path, entry in data.items():
+            path_error = validate_submission_path(path)
+            if path_error:
+                errors[printable(path)] = [path_error]
+                continue
+            file = ProblemFileEntrySerializer(data=entry)
+            if not file.is_valid():
+                errors[printable(path)] = file.errors
+                continue
+            normalized = str(PurePosixPath(path))
+            if normalized in cleaned:
+                errors[printable(path)] = ['This path is listed more than once.']
+                continue
+            cleaned[normalized] = file.validated_data
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return cleaned
 
 class ProblemWithFilesSerializer(serializers.ModelSerializer):
     files = ProblemFileSerializer(many=True, read_only=True)
@@ -112,9 +152,8 @@ class SubmissionFilesSerializer(serializers.Serializer):
                 continue
             cleaned[str(PurePosixPath(path))] = content
 
-        for path in cleaned:
-            if any(str(parent) in cleaned for parent in PurePosixPath(path).parents):
-                errors[printable(path)] = ['A file and a folder cannot share the same path.']
+        for path in path_collisions(cleaned.keys()):
+            errors[printable(path)] = ['A file and a folder cannot share the same path.']
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -131,6 +170,15 @@ class SubmissionFilesSerializer(serializers.Serializer):
 
 def printable(path):
     return str(path).encode('utf-8', 'replace').decode('utf-8')
+
+
+def path_collisions(paths):
+    clashing = set()
+    for path in paths:
+        for parent in PurePosixPath(path).parents:
+            if str(parent) in paths:
+                clashing.update({path, str(parent)})
+    return clashing
 
 
 def validate_submission_path(path):
