@@ -33,7 +33,7 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
         self.client.force_authenticate(None)
 
         response = self.client.post(
-            self.update_url(self.problem_file.id), {'new_content': 'x = 2'}, format='json'
+            self.update_url(self.problem_file.id), {'title': 'Bump x', 'new_content': 'x = 2'}, format='json'
         )
 
         self.assertEqual(response.status_code, 401)
@@ -41,7 +41,7 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
 
     def test_records_an_update_for_your_own_file(self):
         response = self.client.post(
-            self.update_url(self.problem_file.id), {'new_content': 'x = 2'}, format='json'
+            self.update_url(self.problem_file.id), {'title': 'Bump x', 'new_content': 'x = 2'}, format='json'
         )
 
         self.assertEqual(response.status_code, 201)
@@ -49,11 +49,12 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
         update = UpdateProblem.objects.get()
         self.assertEqual(update.problem, self.problem)
         self.assertEqual(update.problem_file, self.problem_file)
+        self.assertEqual(update.title, 'Bump x')
         self.assertEqual(update.new_content, 'x = 2')
 
     def test_original_file_is_not_changed_until_the_update_is_reviewed(self):
         self.client.post(
-            self.update_url(self.problem_file.id), {'new_content': 'x = 2'}, format='json'
+            self.update_url(self.problem_file.id), {'title': 'Bump x', 'new_content': 'x = 2'}, format='json'
         )
 
         self.problem_file.refresh_from_db()
@@ -63,7 +64,7 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
         theirs = self.other_users_file()
 
         response = self.client.post(
-            self.update_url(theirs.id), {'new_content': 'import os'}, format='json'
+            self.update_url(theirs.id), {'title': 'Bump x', 'new_content': 'import os'}, format='json'
         )
 
         self.assertEqual(response.status_code, 404)
@@ -74,7 +75,7 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
 
         self.client.post(
             self.update_url(self.problem_file.id),
-            {'new_content': 'x = 2', 'problem_file': theirs.id, 'problem': str(theirs.problem.id)},
+            {'title': 'Bump x', 'new_content': 'x = 2', 'problem_file': theirs.id, 'problem': str(theirs.problem.id)},
             format='json',
         )
 
@@ -84,13 +85,24 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
 
     def test_unknown_file_is_404(self):
         response = self.client.post(
-            self.update_url(uuid.uuid4()), {'new_content': 'x = 2'}, format='json'
+            self.update_url(uuid.uuid4()), {'title': 'Bump x', 'new_content': 'x = 2'}, format='json'
         )
 
         self.assertEqual(response.status_code, 404)
 
     def test_missing_new_content_is_rejected(self):
-        response = self.client.post(self.update_url(self.problem_file.id), {}, format='json')
+        response = self.client.post(
+            self.update_url(self.problem_file.id), {'title': 'Bump x'}, format='json'
+        )
 
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(UpdateProblem.objects.count(), 0)
+
+    def test_missing_title_is_rejected(self):
+        response = self.client.post(
+            self.update_url(self.problem_file.id), {'new_content': 'x = 2'}, format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('title', response.data)
         self.assertEqual(UpdateProblem.objects.count(), 0)
