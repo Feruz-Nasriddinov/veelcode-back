@@ -189,7 +189,7 @@ done
 SEED_PASSWORD=<password> python manage.py seed
 ```
 
-Creates 10 users (`alice`, `bob`, … with emails `<name>@example.com`, all using `SEED_PASSWORD`), sample problems for every field with hidden tests, plus comments, likes and a year of submissions. Only runs when `DEBUG=True`. Safe to run more than once: existing users aren't duplicated, and problem files are rebuilt from the seed file.
+Creates 10 users (`alice`, `bob`, … with emails `<name>@example.com`, all using `SEED_PASSWORD`), sample problems for every field with hidden tests, plus GitHub/Google social accounts for every other user, README update requests, comments, likes and a year of submissions. Only runs when `DEBUG=True`. Safe to run more than once: existing users aren't duplicated, and problem files are rebuilt from the seed file.
 
 ---
 
