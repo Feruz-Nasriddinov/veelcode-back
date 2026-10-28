@@ -7,8 +7,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
-from problems.models import Comment, Like, Problem, ProblemFile
-from users.models import Submission, User, UserLocation
+from problems.models import Comment, Like, Problem, ProblemFile, UpdateProblem
+from users.models import SocialAccount, Submission, User, UserLocation
 
 TIMEZONES = [
     'UTC', 'Asia/Tokyo', 'Asia/Tashkent', 'Europe/Berlin', 'Europe/London',
@@ -1103,9 +1103,16 @@ COMMENTS = [
     'The difficulty label feels right.',
 ]
 
+UPDATE_TITLES = [
+    'Fix typo in the task description',
+    'Clarify the expected response format',
+    'Add a missing edge case to the README',
+    'Mention the required Python version',
+]
+
 
 class Command(BaseCommand):
-    help = 'Fill the database with dummy users, problems, comments, likes and submissions. Safe to run more than once.'
+    help = 'Fill the database with dummy users, social accounts, problems, update requests, comments, likes and submissions. Safe to run more than once.'
 
     def handle(self, *args, **options):
         if not settings.DEBUG:
@@ -1117,14 +1124,17 @@ class Command(BaseCommand):
         rng = random.Random(42)
         with transaction.atomic():
             users = self.seed_users(rng, password)
+            self.seed_social_accounts(users)
             problems = self.seed_problems(users)
+            self.seed_updates(rng, problems)
             self.seed_comments(rng, users, problems)
             self.seed_submissions(rng, users, Problem.objects.filter(status='accepted'))
 
         self.stdout.write(self.style.SUCCESS(
             f'Done. users={User.objects.count()} problems={Problem.objects.count()} '
             f'files={ProblemFile.objects.count()} comments={Comment.objects.count()} '
-            f'likes={Like.objects.count()} submissions={Submission.objects.count()}'
+            f'likes={Like.objects.count()} submissions={Submission.objects.count()} '
+            f'updates={UpdateProblem.objects.count()} social_accounts={SocialAccount.objects.count()}'
         ))
 
     def seed_users(self, rng, password):
@@ -1136,6 +1146,14 @@ class Command(BaseCommand):
                 UserLocation.objects.create(user=user, timezone=rng.choice(TIMEZONES))
             users.append(user)
         return users
+
+    def seed_social_accounts(self, users):
+        for i, user in enumerate(users[::2]):
+            SocialAccount.objects.get_or_create(
+                provider=SocialAccount.GOOGLE if i % 2 == 0 else SocialAccount.GITHUB,
+                provider_user_id=f'seed-{user.username}',
+                defaults={'user': user},
+            )
 
     def seed_problems(self, users):
         problems = []
@@ -1155,6 +1173,19 @@ class Command(BaseCommand):
             )
             problems.append(problem)
         return problems
+
+    def seed_updates(self, rng, problems):
+        for problem in problems:
+            readme = problem.files.get(directory='README.md')
+            for _ in range(rng.randint(0, 2)):
+                title = rng.choice(UPDATE_TITLES)
+                UpdateProblem.objects.create(
+                    title=title,
+                    problem=problem,
+                    problem_file=readme,
+                    new_content=f'{readme.content}\n{title}.\n',
+                    status=rng.choice(['pending', 'accepted', 'rejected']),
+                )
 
     def seed_comments(self, rng, users, problems):
         for problem in problems:
