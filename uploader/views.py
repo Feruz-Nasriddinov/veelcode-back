@@ -59,6 +59,7 @@ class UpdateUploadedProblemView(APIView):
 class UpdatesHistoryView(generics.ListAPIView):
     serializer_class = UpdateProblemReadSerializer
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'updates-history'
 
     def get_queryset(self):
         return UpdateProblem.objects.filter(problem__created_by = self.request.user).select_related('problem', 'problem_file')
