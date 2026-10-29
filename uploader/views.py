@@ -1,4 +1,4 @@
-from rest_framework import status
+from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -56,13 +56,9 @@ class UpdateUploadedProblemView(APIView):
 
         return Response({'message': 'Updates saved'}, status=status.HTTP_201_CREATED)
 
-class UpdatesHistoryView(APIView):
+class UpdatesHistoryView(generics.ListAPIView):
+    serializer_class = UpdateProblemReadSerializer
     permission_classes = [IsAuthenticated]
-    throttle_scope = 'updates-history'
 
-    def get(self, request):
-        updates = UpdateProblem.objects.filter(problem__created_by = request.user).select_related('problem', 'problem_file')
-
-        serializer = UpdateProblemReadSerializer(updates, many = True)
-
-        return Response(serializer.data)
+    def get_queryset(self):
+        return UpdateProblem.objects.filter(problem__created_by = self.request.user).select_related('problem', 'problem_file')
