@@ -133,7 +133,7 @@ class SubmissionHistoryView(ListAPIView):
     throttle_scope = 'history'
 
     def get_queryset(self):
-        return Submission.objects.filter(user = self.request.user).order_by('-created_at')
+        return Submission.objects.filter(user = self.request.user).select_related('problem').order_by('-created_at')
 
 class CommentView(APIView):
     permission_classes = [IsAuthenticated]
