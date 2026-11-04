@@ -9,7 +9,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import get_object_or_404
+from rest_framework.generics import get_object_or_404, ListAPIView
+from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Problem, ProblemFile, Comment, Like
 from .serializers import (
@@ -124,25 +125,15 @@ class SubmissionDetailView(APIView):
 
         return Response(serializer.data)
 
-class SubmissionHistoryView(APIView):
+class SubmissionHistoryView(ListAPIView):
+    serializer_class = SubmissionSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = HistoryPagination
+    throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'history'
 
-    def get(self, request):
-
-        submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_by')
-
-        paginator = HistoryPagination()
-
-        page = paginator.paginate_queryset(
-            submissions,
-            request,
-            view=self,
-        )
-
-        data = SubmissionSerializer(page, many=True).data
-
-        return paginator.get_paginated_response(data)
+    def get_queryset(self):
+        return Submission.objects.filter(user = self.request.user).order_by('-created_at')
 
 class CommentView(APIView):
     permission_classes = [IsAuthenticated]
