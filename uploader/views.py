@@ -65,4 +65,4 @@ class UpdatesHistoryView(generics.ListAPIView):
     throttle_scope = 'updates-history'
 
     def get_queryset(self):
-        return UpdateProblem.objects.filter(problem__created_by = self.request.user).select_related('problem', 'problem_file').order_by('-created_at')
+        return UpdateProblem.objects.filter(problem__created_by = self.request.user).select_related('problem', 'problem_file').order_by('-created_at', '-id')
