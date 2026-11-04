@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import get_object_or_404
+from rest_framework.throttling import ScopedRateThrottle
 
 from problems.models import Problem, ProblemFile, UpdateProblem
 from problems.serializers import (
@@ -11,7 +12,7 @@ from problems.serializers import (
 )
 
 from .services import add_problem_files
-
+from problems.paginators import HistoryPagination
 class UploadProblemView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'upload-problem'
@@ -59,6 +60,8 @@ class UpdateUploadedProblemView(APIView):
 class UpdatesHistoryView(generics.ListAPIView):
     serializer_class = UpdateProblemReadSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = HistoryPagination
+    throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'updates-history'
 
     def get_queryset(self):
