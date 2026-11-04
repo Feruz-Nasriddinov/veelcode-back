@@ -3,8 +3,10 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.utils import timezone
+from rest_framework.throttling import ScopedRateThrottle
 
 from problems.models import ProblemFile
+from problems.views import SubmissionHistoryView
 from users.models import User, Submission
 
 from .base import PASSWORD, ProblemsTestCase
@@ -253,6 +255,15 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
 
         self.assertEqual([row['score'] for row in response.data['results']], [20, 10])
 
+    def test_same_timestamp_falls_back_to_id(self):
+        first = self.make_submission(id=uuid.UUID(int=2), score=20)
+        self.make_submission(id=uuid.UUID(int=1), score=10)
+        Submission.objects.update(created_at=first.created_at)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual([row['score'] for row in response.data['results']], [20, 10])
+
     def test_every_submission_carries_its_problem(self):
         self.make_submission()
 
@@ -261,6 +272,21 @@ class SubmissionHistoryViewTests(ProblemsTestCase):
         row = response.data['results'][0]
         self.assertIn('problem', row)
         self.assertIn('title', row['problem'])
+
+    def test_query_count_does_not_grow_with_rows(self):
+        self.make_submission()
+        self.make_submission()
+
+        with self.assertNumQueries(2):
+            self.client.get(self.url)
+
+    def test_is_throttled(self):
+        with patch.dict(ScopedRateThrottle.THROTTLE_RATES, {SubmissionHistoryView.throttle_scope: '2/min'}):
+            self.client.get(self.url)
+            self.client.get(self.url)
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 429)
 
 
 class SubmissionDetailViewTests(ProblemsTestCase):
@@ -326,8 +352,6 @@ class ThrottleScopeTests(ProblemsTestCase):
                 self.assertIn(view.throttle_scope, self.rates())
 
     def test_submission_details_scope_is_configured(self):
-        from problems.views import SubmissionHistoryView
-
         self.assertIn(SubmissionHistoryView.throttle_scope, self.rates())
 
 

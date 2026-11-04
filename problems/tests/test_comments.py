@@ -42,7 +42,7 @@ class CommentViewTestCase(ProblemsTestCase):
     def expected_comment(self, comment, like_count=0, liked_by_me=False, author=None):
         author = author or self.user
         return {
-            'id': comment.id,
+            'id': str(comment.id),
             'text': comment.text,
             'like_count': like_count,
             'liked_by_me': liked_by_me,
@@ -145,7 +145,7 @@ class CommentPatchViewTests(CommentViewTestCase):
         self.assertEqual(comment.text, 'Nice problem')
 
     def test_unknown_comment_is_404(self):
-        response = self.call(CommentPatchView, 'patch', {'text': 'edited'}, comment_id=999)
+        response = self.call(CommentPatchView, 'patch', {'text': 'edited'}, comment_id=uuid.uuid4())
 
         self.assertEqual(response.status_code, 404)
 
@@ -185,7 +185,7 @@ class CommentDeleteViewTests(CommentViewTestCase):
         self.assertTrue(Comment.objects.filter(id=comment.id).exists())
 
     def test_unknown_comment_is_404(self):
-        response = self.call(CommentDeleteView, 'delete', comment_id=999)
+        response = self.call(CommentDeleteView, 'delete', comment_id=uuid.uuid4())
 
         self.assertEqual(response.status_code, 404)
 
@@ -233,7 +233,7 @@ class LikeViewTests(CommentViewTestCase):
         self.assertEqual(comment.like_count, 1)
 
     def test_unknown_comment_is_404(self):
-        response = self.call(LikeView, 'post', comment_id=999)
+        response = self.call(LikeView, 'post', comment_id=uuid.uuid4())
 
         self.assertEqual(response.status_code, 404)
         self.assertEqual(Like.objects.count(), 0)
@@ -282,7 +282,7 @@ class UnlikeViewTests(CommentViewTestCase):
         self.assertEqual(comment.like_count, 0)
 
     def test_unknown_comment_is_404(self):
-        response = self.call(UnlikeView, 'delete', comment_id=999)
+        response = self.call(UnlikeView, 'delete', comment_id=uuid.uuid4())
 
         self.assertEqual(response.status_code, 404)
 
@@ -409,7 +409,7 @@ class CommentListViewTests(CommentViewTestCase):
 
         response = self.list()
 
-        self.assertEqual([c['id'] for c in response.data['results']], [mine.id])
+        self.assertEqual([c['id'] for c in response.data['results']], [str(mine.id)])
 
     def test_liked_by_me_is_per_viewer(self):
         liked = self.make_comment(text='liked')
@@ -420,7 +420,7 @@ class CommentListViewTests(CommentViewTestCase):
 
         self.assertEqual(
             {c['id']: c['liked_by_me'] for c in results},
-            {liked.id: True, not_liked.id: False},
+            {str(liked.id): True, str(not_liked.id): False},
         )
 
     def test_liked_by_me_is_false_when_only_others_liked(self):
