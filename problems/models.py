@@ -86,6 +86,11 @@ class ProblemFile(models.Model):
         return f'{self.problem.title}-{self.directory}'
 
 class UpdateProblem(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=True
+    )
     STATUS_CHOICES = [
             ('pending', 'pending'),
             ('accepted', 'accepted'),
@@ -103,6 +108,11 @@ class UpdateProblem(models.Model):
         return f'{self.problem.id}-{self.problem_file.directory}'
 
 class Comment(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=True
+    )
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name='comments')
     text = models.CharField(max_length=1000)
