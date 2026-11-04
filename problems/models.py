@@ -97,6 +97,7 @@ class UpdateProblem(models.Model):
     problem_file = models.ForeignKey(ProblemFile, on_delete=models.CASCADE)
     new_content = models.TextField()
     status = models.CharField(choices=STATUS_CHOICES, max_length=8, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f'{self.problem.id}-{self.problem_file.directory}'
