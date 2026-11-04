@@ -130,7 +130,7 @@ class SubmissionHistoryView(APIView):
 
     def get(self, request):
 
-        submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_at')# '-' for descending order
+        submissions = Submission.objects.filter(user = request.user).select_related('problem').order_by('-created_by')
 
         paginator = HistoryPagination()
 
@@ -138,7 +138,6 @@ class SubmissionHistoryView(APIView):
             submissions,
             request,
             view=self,
-
         )
 
         data = SubmissionSerializer(page, many=True).data
