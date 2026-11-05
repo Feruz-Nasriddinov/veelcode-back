@@ -101,7 +101,7 @@ class ProblemSerializer(serializers.ModelSerializer):
 class UpdateProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpdateProblem
-        fields = ['id', 'title', 'new_content']
+        fields = ['id', 'title', 'new_content', 'created_at']
 
     def validate_new_content(self, value):
         return validate_problem_content(value)
@@ -112,7 +112,7 @@ class UpdateProblemReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UpdateProblem
-        fields = ['id', 'title', 'problem', 'problem_file', 'status']
+        fields = ['id', 'title', 'problem', 'problem_file', 'status', 'created_at']
 
 class SubmissionFilesSerializer(serializers.Serializer):
     def to_internal_value(self, data):
