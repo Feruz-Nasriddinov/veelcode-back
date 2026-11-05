@@ -29,6 +29,7 @@ class ProfileViewTests(UsersTestCase):
             'framework': 'django',
             'difficulty': 'medium',
             'score': 75,
+            'created_at': submission.created_at.isoformat().replace('+00:00', 'Z'),
         }])
 
     def test_excludes_other_users_submissions(self):

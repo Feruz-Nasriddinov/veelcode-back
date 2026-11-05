@@ -1,5 +1,7 @@
 import uuid
 
+from django.utils import timezone
+
 from problems.models import Problem, ProblemFile, UpdateProblem
 from users.models import User
 
@@ -82,6 +84,17 @@ class UpdateUploadedProblemViewTests(UploaderTestCase):
         update = UpdateProblem.objects.get()
         self.assertEqual(update.problem_file, self.problem_file)
         self.assertEqual(update.problem, self.problem)
+
+    def test_body_cannot_set_created_at(self):
+        before = timezone.now()
+
+        self.client.post(
+            self.update_url(self.problem_file.id),
+            {'title': 'Bump x', 'new_content': 'x = 2', 'created_at': '2020-01-01T00:00:00Z'},
+            format='json',
+        )
+
+        self.assertGreaterEqual(UpdateProblem.objects.get().created_at, before)
 
     def test_unknown_file_is_404(self):
         response = self.client.post(

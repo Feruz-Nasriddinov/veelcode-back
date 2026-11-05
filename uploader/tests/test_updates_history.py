@@ -46,6 +46,7 @@ class UpdatesHistoryViewTests(UploaderTestCase):
         self.assertEqual(row['id'], str(mine.id))
         self.assertEqual(row['title'], 'Mine')
         self.assertEqual(row['status'], 'pending')
+        self.assertEqual(row['created_at'], mine.created_at.isoformat().replace('+00:00', 'Z'))
         self.assertEqual(row['problem']['id'], str(mine.problem.id))
         self.assertEqual(row['problem_file']['id'], str(mine.problem_file.id))
 

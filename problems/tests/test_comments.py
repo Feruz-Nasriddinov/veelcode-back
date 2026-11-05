@@ -51,6 +51,22 @@ class CommentViewTestCase(ProblemsTestCase):
         }
 
 
+class CommentRoutingTests(CommentViewTestCase):
+    def test_integer_comment_id_is_404(self):
+        routes = [
+            (CommentPatchView, 'patch'),
+            (CommentDeleteView, 'delete'),
+            (LikeView, 'post'),
+            (UnlikeView, 'delete'),
+        ]
+
+        for view, method in routes:
+            with self.subTest(view=view.__name__):
+                response = self.call(view, method, comment_id=1)
+
+                self.assertEqual(response.status_code, 404)
+
+
 class CommentCreateViewTests(CommentViewTestCase):
     def test_requires_authentication(self):
         response = self.call(
