@@ -24,6 +24,7 @@ class WriteAndPatchCommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id', 'text']
+        read_only_fields = ['id']
 
 class ProblemFileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -102,6 +103,7 @@ class UpdateProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = UpdateProblem
         fields = ['id', 'title', 'new_content', 'created_at']
+        read_only_fields = ['id']
 
     def validate_new_content(self, value):
         return validate_problem_content(value)
