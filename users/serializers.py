@@ -17,4 +17,4 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Submission
-        fields = ['id', 'username', 'language', 'framework', 'difficulty', 'score']
+        fields = ['id', 'username', 'language', 'framework', 'difficulty', 'score', 'created_at']
