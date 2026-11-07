@@ -226,7 +226,7 @@ REST_FRAMEWORK = {
         'send-problems': '20/min',
         'send-content': '20/min',
         'send-score': '20/min',
-        'submit': '10/min',
+        'submit': '3/min',
         'submit-details': '40/min',
         'upload-problem': '3/min',
         'upload-files': '10/min',

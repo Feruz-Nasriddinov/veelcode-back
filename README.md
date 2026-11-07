@@ -251,7 +251,7 @@ Defined in `config/settings.py` under `REST_FRAMEWORK.DEFAULT_THROTTLE_RATES`, a
 |-------|------|---------|
 | `send-problems` | 20/min | Problem list |
 | `send-content` | 20/min | Problem detail |
-| `submit` | 10/min | Submit |
+| `submit` | 3/min | Submit |
 | `submit-details` | 40/min | Submission score |
 | `history` | 20/min | Submission history |
 | `comments-read` | 60/min | Reading comments |
