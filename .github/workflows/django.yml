@@ -33,7 +33,6 @@ jobs:
       - name: Deployment checks
         env:
           DEBUG: 'False'
-          AUTH_COOKIE_SECURE: 'True'
           REDIS_URL: redis://127.0.0.1:6379/1
           ALLOWED_HOSTS: example.com
         run: python manage.py check --deploy --fail-level ERROR

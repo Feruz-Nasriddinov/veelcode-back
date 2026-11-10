@@ -3,7 +3,7 @@ from datetime import datetime
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.test import APIClient
+from config.testing import SecureAPIClient
 
 from problems.models import Problem
 from users.models import User, Submission
@@ -12,7 +12,7 @@ PASSWORD = 'Sup3rSecret!pass'
 
 
 class UsersTestCase(TestCase):
-    client_class = APIClient
+    client_class = SecureAPIClient
 
     def setUp(self):
         super().setUp()

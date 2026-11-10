@@ -1,5 +1,5 @@
 from django.test import override_settings
-from rest_framework.test import APIClient
+from config.testing import SecureAPIClient
 
 from .base import (
     CSRF_URL,
@@ -18,7 +18,7 @@ PROBE_URL = '/api/probe/'
 class EnforcingClientMixin:
     def setUp(self):
         super().setUp()
-        self.client = APIClient(enforce_csrf_checks=True)
+        self.client = SecureAPIClient(enforce_csrf_checks=True)
 
     def csrf_token(self):
         self.client.get(CSRF_URL)

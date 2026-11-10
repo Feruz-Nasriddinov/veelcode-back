@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.core.cache import cache
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
+from config.testing import SecureAPIClient
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
@@ -71,17 +71,19 @@ class SpoofedForwardedForTests(AuthTestCase):
 class RequestSizeLimitTests(TestCase):
     @override_settings(REQUEST_MAX_BYTES=100)
     def test_oversized_body_is_refused_before_parsing(self):
-        response = APIClient().post(LOGIN_URL, 'x' * 500, content_type='application/json')
+        response = SecureAPIClient().post(LOGIN_URL, 'x' * 500, content_type='application/json')
 
         self.assertEqual(response.status_code, 413)
 
     def test_normal_body_passes(self):
-        response = APIClient().post(LOGIN_URL, {'identifier': 'a', 'password': 'b'}, format='json')
+        response = SecureAPIClient().post(LOGIN_URL, {'identifier': 'a', 'password': 'b'}, format='json')
 
         self.assertEqual(response.status_code, 401)
 
 
 class AdminLoginThrottleTests(TestCase):
+    client_class = SecureAPIClient
+
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)
@@ -101,9 +103,9 @@ class AdminLoginThrottleTests(TestCase):
 
 class ApiDocsAccessTests(TestCase):
     def test_schema_is_closed_to_anonymous_and_normal_users(self):
-        self.assertIn(APIClient().get('/api/schema').status_code, (401, 403))
+        self.assertIn(SecureAPIClient().get('/api/schema').status_code, (401, 403))
         user = User.objects.create_user(username='u', email='u@example.com', password='Sup3rSecret!pass')
-        client = APIClient()
+        client = SecureAPIClient()
         client.force_authenticate(user)
         self.assertEqual(client.get('/api/schema').status_code, 403)
 
@@ -111,7 +113,7 @@ class ApiDocsAccessTests(TestCase):
         admin = User.objects.create_user(
             username='a', email='a@example.com', password='Sup3rSecret!pass', is_staff=True
         )
-        client = APIClient()
+        client = SecureAPIClient()
         client.force_authenticate(admin)
         self.assertEqual(client.get('/api/schema').status_code, 200)
 

@@ -1,6 +1,6 @@
 from django.core.cache import cache
 from django.test import TestCase
-from rest_framework.test import APIClient
+from config.testing import SecureAPIClient
 
 from problems.models import Problem, ProblemFile
 from users.models import User
@@ -9,7 +9,7 @@ PASSWORD = 'Sup3rSecret!pass'
 
 
 class ProblemsTestCase(TestCase):
-    client_class = APIClient
+    client_class = SecureAPIClient
 
     def setUp(self):
         super().setUp()

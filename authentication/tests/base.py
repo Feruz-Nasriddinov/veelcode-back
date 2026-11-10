@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
-from rest_framework.test import APIClient
+from config.testing import SecureAPIClient
 
 User = get_user_model()
 
@@ -22,7 +22,7 @@ VALID_PASSWORD = 'Sup3rSecret!pass'
 
 
 class AuthTestCase(TestCase):
-    client_class = APIClient
+    client_class = SecureAPIClient
 
     def setUp(self):
         super().setUp()
