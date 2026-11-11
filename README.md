@@ -219,7 +219,7 @@ See `.env.example`. Origins must include the scheme (`https://...`), or Django r
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SECRET_KEY` | insecure dev key, only when `DEBUG=True` | **Required when `DEBUG=False`**, or Django refuses to start. |
-| `JWT_SIGNING_KEY` | insecure dev key | **Set in production.** Signs JWTs. |
+| `JWT_SIGNING_KEY` | insecure dev key, only when `DEBUG=True` | **Required when `DEBUG=False`**, or Django refuses to start. Signs JWTs. |
 | `DEBUG` | `False` | Set `True` for local dev. Also turns off the HTTP-to-HTTPS redirect and `Secure` cookies; with `False`, all HTTP requests are redirected. |
 | `ALLOWED_HOSTS` | empty | Comma-separated. Required when `DEBUG=False`. |
 | `DATABASE_URL` | `sqlite:///db.sqlite3` | e.g. a Postgres URL in production. |

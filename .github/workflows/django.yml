@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SECRET_KEY: ${{ github.sha }}-${{ github.run_id }}-ci-not-a-real-secret
+      JWT_SIGNING_KEY: ${{ github.sha }}-${{ github.run_id }}-ci-not-a-real-jwt-key
       REDIS_URL: redis://127.0.0.1:6379/1
 
     steps:

@@ -260,7 +260,9 @@ OAUTH_STATE_MAX_AGE = 600
 
 AUTH_USER_MODEL = 'users.User'
 
-JWT_SIGNING_KEY = os.getenv('JWT_SIGNING_KEY', 'django-insecure-jwt-dev-key-do-not-use-in-production')
+JWT_SIGNING_KEY = os.getenv('JWT_SIGNING_KEY') or ("django-test-jwt-signing-key" if DEBUG else '')
+if not JWT_SIGNING_KEY:
+    raise ImproperlyConfigured('JWT_SIGNING_KEY must be set when DEBUG is False.')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=10),
