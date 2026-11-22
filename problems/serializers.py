@@ -96,7 +96,7 @@ class ProblemWithFilesSerializer(serializers.ModelSerializer):
 class ProblemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Problem
-        fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework', 'source']#time_required is not included because uploaded problems should be checked and run by admins and record it
+        fields = ['id', 'title', 'description', 'difficulty', 'field', 'language', 'framework', 'source']#time_required is not included because uploaded problems should be checked and run by admins and recorded
         read_only_fields = ['id']
 
 class UpdateProblemSerializer(serializers.ModelSerializer):
