@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import get_object_or_404, ListAPIView
+from rest_framework.generics import get_object_or_404, ListAPIView, RetrieveAPIView
 from rest_framework.throttling import ScopedRateThrottle
 
 from .models import Problem, ProblemFile, Comment, Like
@@ -113,17 +113,16 @@ class SubmitView(APIView):
 
         return Response({'submission_id': submission.id, 'status': 'pending'}, status=status.HTTP_202_ACCEPTED)
 
-class SubmissionDetailView(APIView):
+class SubmissionDetailView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'submit-details'
+    serializer_class = SubmissionSerializer
+    lookup_field = 'id'
+    lookup_url_kwarg = 'submission_id'
 
-    def get(self, request, submission_id):
-
-        submission = get_object_or_404(Submission, id = submission_id, user = request.user)
-
-        serializer = SubmissionSerializer(submission)
-
-        return Response(serializer.data)
+    def get_queryset(self):
+        return Submission.objects.filter(user = self.request.user)
 
 class SubmissionHistoryView(ListAPIView):
     serializer_class = SubmissionSerializer
